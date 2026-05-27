@@ -25,8 +25,8 @@ flowchart LR
 
 | ファイル | 内容 |
 |---------|------|
-| [AGENTS.md](./AGENTS.md) | 要件・振る舞い（仕様の正本） |
-| [docs/deploy.md](./docs/deploy.md) | セットアップ・更新 |
+| [AGENTS.md](./AGENTS.md) | 要件・振る舞い・単体テスト観点（仕様の正本） |
+| [docs/deploy.md](./docs/deploy.md) | セットアップ・更新・単体テスト実行手順 |
 | [docs/git.md](./docs/git.md) | Git 運用・コミットメッセージ |
 | [.env.example](./.env.example) | 環境変数名テンプレ |
 | [TODO.md](./TODO.md) | 未完了タスク（チェックリスト） |
