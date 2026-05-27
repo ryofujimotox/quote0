@@ -59,6 +59,20 @@ cd /home/scripts/handy-calendar
 
 
 
+### ローカル単体テスト
+
+ローカルで単体テストを実行するときだけ、開発依存を入れて実行する（本番運用の cron 実行環境には入れない）。
+
+```bash
+cd /home/scripts/handy-calendar
+.venv/bin/pip install -r requirements-dev.txt # 初回のみ
+.venv/bin/python -m pytest
+```
+
+- 失敗 0 件で終了すれば OK（観点は [AGENTS.md](../AGENTS.md) の「単体テスト（最小仕様）」を参照）
+
+
+
 ### cron 登録
 
 `crontab -e` でエディタを開き、次の 1 行を追加する。
