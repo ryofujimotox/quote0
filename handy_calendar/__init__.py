@@ -1,0 +1,1 @@
+"""handy_calendar パッケージ。"""
