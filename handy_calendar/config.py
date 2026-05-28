@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .errors import HandyCalendarError
 
-class ConfigError(ValueError):
+
+class ConfigError(HandyCalendarError, ValueError):
     """設定不備を表す例外。"""
 
 
@@ -21,9 +24,9 @@ class AppConfig:
     dot_device_id: str
 
 
-def load_config() -> AppConfig:
+def load_config(env_file: str | Path | None = None) -> AppConfig:
     """`.env` を読み込み、必須環境変数を検証した設定を返す。"""
-    load_dotenv()
+    load_dotenv(dotenv_path=env_file)
 
     ical_urls_raw = os.getenv("ICAL_URLS", "")
     dot_api_token = os.getenv("DOT_API_TOKEN", "").strip()
