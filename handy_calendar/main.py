@@ -4,20 +4,36 @@ from __future__ import annotations
 
 import sys
 
-from .config import ConfigError, load_config
+from .config import load_config
+from .errors import HandyCalendarError
+from .steps.dot import send_dot_image
+from .steps.ical import fetch_icals, parse_icals, today_in_jst
+from .steps.render import render_png
+
+
+def log_error(message: str) -> None:
+    """cron で追えるように stderr へ日本語の失敗理由を出す。"""
+    print(message, file=sys.stderr)
 
 
 def main() -> int:
-    """設定読込までを行い、起動確認用メッセージを出す。"""
+    """設定読込後、仮の処理段を順番に実行する。"""
     try:
         config = load_config()
-    except ConfigError as exc:
-        print(f"設定エラー: {exc}", file=sys.stderr)
+        today = today_in_jst()
+        calendars = fetch_icals(config.ical_urls)
+        calendar = parse_icals(calendars, today)
+        image = render_png(calendar)
+        send_dot_image(config, image)
+    except HandyCalendarError as exc:
+        log_error(f"起動失敗: {exc}")
+        return 1
+    except Exception as exc:
+        log_error(f"起動失敗: 想定外のエラーです: {exc}")
         return 1
 
-    # 後続処理（iCal 取得 -> PNG 生成 -> Dot 送信）の入口になる起動ログ。
     print(
-        "起動確認OK: handy_calendar を開始します "
+        "起動確認OK: handy_calendar の仮処理が完了しました "
         f"(ical_urls={len(config.ical_urls)}件, device_id={config.dot_device_id})"
     )
     return 0
