@@ -10,6 +10,7 @@ alwaysApply: true
 ## ドキュメントの分担
 
 - 仕様の正本: `AGENTS.md`
+- 骨組みの地図: `AGENTS.md` の「エージェント向け」（説明の正本は `handy_calendar/` のコメント）
 - 手順の正本: `docs/deploy.md`
 - 入口と地図: `README.md`（地図とリンクのみ。30 秒で「何のプロジェクトか・次にどこを読むか」が分かること）
 - タスクの正本: `TODO.md`（書き方は下記「`TODO.md`」）
