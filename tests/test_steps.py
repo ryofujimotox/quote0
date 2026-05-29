@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import pytest
+
 from handy_calendar.config import AppConfig
-from handy_calendar.models import CalendarWindow, DaySchedule, DotSendResult, PngImage
+from handy_calendar.errors import HandyCalendarError
+from handy_calendar.models import CalendarWindow, DaySchedule, PngImage
 from handy_calendar.steps.dot import send_dot_image
 from handy_calendar.steps.ical import day_range, fetch_icals, parse_icals
 from handy_calendar.steps.render import render_png
@@ -49,13 +52,12 @@ def test_render_png_is_deterministic() -> None:
     assert first.content.startswith(b"\x89PNG\r\n\x1a\n")
 
 
-def test_send_dot_image_returns_success_model() -> None:
+def test_send_dot_image_fails_until_real_api_is_implemented() -> None:
     config = AppConfig(
         ical_urls=("https://example.com/a.ics",),
         dot_api_token="token",
         dot_device_id="device",
     )
 
-    result = send_dot_image(config, PngImage(content=b"png", width=1, height=1))
-
-    assert result == DotSendResult(status_code=200, response_text="dummy")
+    with pytest.raises(HandyCalendarError, match="Dot 送信は未実装"):
+        send_dot_image(config, PngImage(content=b"png", width=1, height=1))

@@ -93,3 +93,12 @@ def test_main_returns_non_zero_and_stops_when_step_fails(monkeypatch, capsys) ->
     assert main_module.main() == 1
     assert called == ["fetch"]
     assert "iCal 取得失敗" in capsys.readouterr().err
+
+
+def test_main_returns_non_zero_until_dot_send_is_implemented(monkeypatch, capsys) -> None:
+    window = make_window()
+    monkeypatch.setattr(main_module, "load_config", make_config)
+    monkeypatch.setattr(main_module, "today_in_jst", lambda: window.today.day)
+
+    assert main_module.main() == 1
+    assert "Dot 送信は未実装" in capsys.readouterr().err
