@@ -53,9 +53,11 @@ chmod 600 .env
 ```bash
 cd /home/scripts/handy-calendar
 .venv/bin/python -m handy_calendar
+echo $?
 ```
 
 - **終了コード 0** が出たら OK（詳細は [AGENTS.md](../AGENTS.md) の「成功または失敗時の挙動」を参照）
+- 失敗時は stderr の日本語メッセージを確認する。
 
 
 

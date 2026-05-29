@@ -12,8 +12,7 @@
 | 作業ツリー | clean |
 | 実装コード | **まだ無し**（`handy_calendar` パッケージ未作成） |
 | PR | `docs/project-bootstrap` → `dev` |
-
-
+| Reviewer | @codex review |
 
 ## 🎯 この整理のゴール
 
@@ -74,3 +73,13 @@
 | — | 🎉 | `🎉 Initial commit`（`main` の初回のみ。Type 省略） |
 
 **この表以外の絵文字は使わない。**
+
+
+
+
+## その他のルール
+
+task.mdはローカルで管理する
+
+
+
