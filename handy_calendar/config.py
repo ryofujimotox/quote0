@@ -4,26 +4,44 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .errors import HandyCalendarError
 
-class ConfigError(ValueError):
+
+class ConfigError(HandyCalendarError, ValueError):
     """設定不備を表す例外。"""
 
 
 @dataclass(frozen=True)
 class AppConfig:
-    """アプリ全体で使う設定値。"""
+    """アプリ全体で使う設定値。
+
+    例: AppConfig(
+            ical_urls=("https://cal.example/a.ics",),
+            dot_api_token="token",
+            dot_device_id="dev-1",
+        )
+    """
 
     ical_urls: tuple[str, ...]
     dot_api_token: str
     dot_device_id: str
 
 
-def load_config() -> AppConfig:
-    """`.env` を読み込み、必須環境変数を検証した設定を返す。"""
-    load_dotenv()
+def load_config(env_file: str | Path | None = None) -> AppConfig:
+    """`.env` を読み込み、必須環境変数を検証した設定を返す。
+
+    例: ICAL_URLS=https://cal.example/a.ics, DOT_API_TOKEN=token, DOT_DEVICE_ID=dev-1
+        → AppConfig(
+            ical_urls=("https://cal.example/a.ics",),
+            dot_api_token="token",
+            dot_device_id="dev-1",
+          )
+    """
+    load_dotenv(dotenv_path=env_file)
 
     ical_urls_raw = os.getenv("ICAL_URLS", "")
     dot_api_token = os.getenv("DOT_API_TOKEN", "").strip()
