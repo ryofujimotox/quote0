@@ -61,18 +61,18 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
 
 
 def parse_icals(calendars: tuple[FetchedIcal, ...], today: date) -> CalendarWindow:
-    """取得済み ICS から今日・明日の予定を抽出する。
+    """取得済み ICS から今日・次の予定日の予定を抽出する。
+
+    2 枠目は today より後で最初に予定がある日。見つからなければ翌日の空枠。
 
     例: calendars=(FetchedIcal(0, "https://…", "BEGIN:VCALENDAR…"),), today=2026-05-29
         → CalendarWindow(
             today=DaySchedule(2026-05-29, period=29日0時〜30日0時, events=()),
-            tomorrow=DaySchedule(2026-05-30, period=30日0時〜31日0時, events=()),
+            next_day=DaySchedule(2026-05-31, period=31日0時〜6/1 0時, events=()),
           )
     """
     print(f"iCal 解析: {len(calendars)}件", flush=True)
-    tomorrow = today + timedelta(days=1)
     today_period = day_range(today)
-    tomorrow_period = day_range(tomorrow)
     events = _sorted_events(event for calendar in calendars for event in _parse_calendar_events(calendar))
     print(f"iCal 解析詳細: total_events={len(events)}", flush=True)
     for event in events:
@@ -83,10 +83,41 @@ def parse_icals(calendars: tuple[FetchedIcal, ...], today: date) -> CalendarWind
             f"all_day={event.all_day}",
             flush=True,
         )
+    next_day = _find_next_event_day(events, today)
+    next_day_period = day_range(next_day)
     return CalendarWindow(
         today=DaySchedule(day=today, period=today_period, events=_events_for_day(events, today_period)),
-        tomorrow=DaySchedule(day=tomorrow, period=tomorrow_period, events=_events_for_day(events, tomorrow_period)),
+        next_day=DaySchedule(
+            day=next_day,
+            period=next_day_period,
+            events=_events_for_day(events, next_day_period),
+        ),
     )
+
+
+def _find_next_event_day(events: tuple[CalendarEvent, ...], today: date) -> date:
+    """today より後で最初に予定がある日。なければ翌日（空枠用）。"""
+    candidate_days = _days_with_events_after(events, today)
+    if candidate_days:
+        return candidate_days[0]
+    return today + timedelta(days=1)
+
+
+def _days_with_events_after(events: tuple[CalendarEvent, ...], today: date) -> tuple[date, ...]:
+    """today より後に overlap する予定があるカレンダー日を昇順で返す。"""
+    days: set[date] = set()
+    for event in events:
+        current = event.period.start.astimezone(JST).date()
+        end = event.period.end.astimezone(JST)
+        if end.time() == time.min and end.date() > current:
+            last = end.date() - timedelta(days=1)
+        else:
+            last = end.date()
+        while current <= last:
+            if current > today:
+                days.add(current)
+            current += timedelta(days=1)
+    return tuple(sorted(days))
 
 
 def _decode_ics(content: bytes, headers: Message) -> str:

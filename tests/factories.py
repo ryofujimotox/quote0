@@ -12,11 +12,12 @@ from handy_calendar.models import CalendarEvent, CalendarWindow, DateRange, DayS
 from handy_calendar.steps.ical import day_range
 from handy_calendar.steps.render import DisplayDay, DisplayEvent
 
-DisplaySection = Literal["today", "tomorrow"]
+DisplaySection = Literal["today", "secondary"]
 
 # テスト全体で基準日を揃える（2026-05-29 = 金曜）
 REFERENCE_TODAY = date(2026, 5, 29)
 REFERENCE_TOMORROW = date(2026, 5, 30)
+REFERENCE_DAY_PLUS_3 = date(2026, 6, 1)
 
 ICS_URL_A = "https://example.com/a.ics"
 ICS_URL_B = "https://example.com/b.ics"
@@ -81,11 +82,15 @@ def make_all_day_event(
     )
 
 
-def make_empty_window(base_day: date = REFERENCE_TODAY) -> CalendarWindow:
-    tomorrow = base_day + timedelta(days=1)
+def make_empty_window(
+    base_day: date = REFERENCE_TODAY,
+    *,
+    next_day: date | None = None,
+) -> CalendarWindow:
+    second_day = next_day or (base_day + timedelta(days=1))
     return CalendarWindow(
         today=DaySchedule(day=base_day, period=day_range(base_day), events=()),
-        tomorrow=DaySchedule(day=tomorrow, period=day_range(tomorrow), events=()),
+        next_day=DaySchedule(day=second_day, period=day_range(second_day), events=()),
     )
 
 
@@ -93,12 +98,13 @@ def make_window(
     *,
     base_day: date = REFERENCE_TODAY,
     today_events: tuple[CalendarEvent, ...] = (),
-    tomorrow_events: tuple[CalendarEvent, ...] = (),
+    next_day: date | None = None,
+    next_day_events: tuple[CalendarEvent, ...] = (),
 ) -> CalendarWindow:
-    tomorrow = base_day + timedelta(days=1)
+    second_day = next_day or (base_day + timedelta(days=1))
     return CalendarWindow(
         today=DaySchedule(day=base_day, period=day_range(base_day), events=today_events),
-        tomorrow=DaySchedule(day=tomorrow, period=day_range(tomorrow), events=tomorrow_events),
+        next_day=DaySchedule(day=second_day, period=day_range(second_day), events=next_day_events),
     )
 
 
@@ -115,7 +121,7 @@ def make_window_with_timed_events() -> CalendarWindow:
     """build_display_days / _build_lines で使う代表例（今日・明日に 1 件ずつ）。"""
     return make_window(
         today_events=(make_timed_event("today", start=(10, 0), end=(10, 30)),),
-        tomorrow_events=(
+        next_day_events=(
             make_timed_event("tomorrow", day=REFERENCE_TOMORROW, start=(15, 0), end=(16, 0)),
         ),
     )
@@ -143,18 +149,22 @@ def empty_today_display_day() -> DisplayDay:
     return display_day(day=REFERENCE_TODAY, header="今日（5/29金）", section="today")
 
 
-def empty_tomorrow_display_day() -> DisplayDay:
-    return display_day(day=REFERENCE_TOMORROW, header="明日（5/30土）", section="tomorrow")
+def empty_next_day_display_day(
+    *,
+    day: date = REFERENCE_TOMORROW,
+    header: str = "明日（5/30土）",
+) -> DisplayDay:
+    return display_day(day=day, header=header, section="secondary")
 
 
 def assert_window_event_uids(
     window: CalendarWindow,
     *,
     today: tuple[str, ...],
-    tomorrow: tuple[str, ...],
+    next_day: tuple[str, ...],
 ) -> None:
     assert tuple(event.uid for event in window.today.events) == today
-    assert tuple(event.uid for event in window.tomorrow.events) == tomorrow
+    assert tuple(event.uid for event in window.next_day.events) == next_day
 
 
 class FakeResponse:

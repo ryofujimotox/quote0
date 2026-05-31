@@ -2,7 +2,7 @@
 
 ふれるカレンダー
 
-公開 iCal から **今日・明日** の予定を PNG にし、[Quote/0（Dot.）](https://dot.mindreset.tech/) の表示を更新するバッチ。
+公開 iCal から **今日・予定がある次の日** の予定を PNG にし、[Quote/0（Dot.）](https://dot.mindreset.tech/) の表示を更新するバッチ。
 
 ```mermaid
 flowchart LR

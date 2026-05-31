@@ -26,7 +26,8 @@ def main() -> int:
         calendar = parse_icals(calendars, today)
         print(
             "iCal 解析完了: "
-            f"today={len(calendar.today.events)}件, tomorrow={len(calendar.tomorrow.events)}件",
+            f"today={len(calendar.today.events)}件, "
+            f"next_day={calendar.next_day.day.isoformat()}({len(calendar.next_day.events)}件)",
             flush=True,
         )
         image = render_png(calendar)

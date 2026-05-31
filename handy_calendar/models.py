@@ -15,7 +15,7 @@ class DateRange:
     """JST の半開区間 [start, end)。
 
     例: start=01/01 0:00, end=01/05 0:00 なら 01/01〜01/04 は含むが 01/05 は含まない。
-    今日・明日の日枠と予定の期間を同じルールで表す。
+    今日・次の予定日の日枠と予定の期間を同じルールで表す。
     """
 
     start: datetime
@@ -28,7 +28,7 @@ class DateRange:
             raise ValueError("DateRange は start < end で指定してください。")
 
     def overlaps(self, other: "DateRange") -> bool:
-        """予定が今日/明日の枠にかかっているかを判定する。
+        """予定が日枠にかかっているかを判定する。
 
         典型: day_schedule.period.overlaps(event.period)
 
@@ -87,13 +87,13 @@ class DaySchedule:
 
 @dataclass(frozen=True)
 class CalendarWindow:
-    """今日・明日の表示データ。
+    """今日・次の予定日の表示データ。
 
-    例: CalendarWindow(today=DaySchedule(2026-05-29, …), tomorrow=DaySchedule(2026-05-30, …))
+    例: CalendarWindow(today=DaySchedule(2026-05-29, …), next_day=DaySchedule(2026-05-31, …))
     """
 
     today: DaySchedule
-    tomorrow: DaySchedule
+    next_day: DaySchedule
 
 
 @dataclass(frozen=True)

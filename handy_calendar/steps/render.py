@@ -4,7 +4,7 @@
   今日（5/29金）
     予定名（10:00~10:30）  … 1行 = 予定 + 括弧付き時刻
   ── 区切り線
-  明日（5/30土）
+  3日後（6/2月）
     …
 
 予定行の省略優先度: 開始時刻 → 予定名 → 終了時刻
@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from ..models import CalendarEvent, CalendarWindow, DaySchedule, PngImage
 
-Section = Literal["today", "tomorrow"]
+Section = Literal["today", "secondary"]
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ EVENT_INDENT = 6
 DIVIDER_TOP_PAD = 4
 DIVIDER_BOTTOM_PAD = 4
 
-# サイズは揃え、今日ブロックだけ太字（明日は通常ウェイト）
+# サイズは揃え、今日ブロックだけ太字（2 枠目は通常ウェイト）
 DATE_FONT_SIZE = 20
 TIME_FONT_SIZE = 20
 TITLE_FONT_SIZE = 20
@@ -103,7 +103,7 @@ class EventLine:
 
 @dataclass(frozen=True)
 class DayDividerLine:
-    """今日ブロックと明日ブロックの間の横線"""
+    """今日ブロックと2枠目ブロックの間の横線"""
 
 
 @dataclass(frozen=True)
@@ -121,7 +121,7 @@ class DayFonts:
 @dataclass(frozen=True)
 class RenderFonts:
     today: DayFonts
-    tomorrow: DayFonts
+    secondary: DayFonts
 
 
 RenderLine = DateHeaderLine | EventLine | DayDividerLine
@@ -130,22 +130,27 @@ RenderLine = DateHeaderLine | EventLine | DayDividerLine
 def build_display_days(calendar: CalendarWindow) -> tuple[DisplayDay, ...]:
     """CalendarWindow を上から描く日ブロック列に変換する。
 
-    例: CalendarWindow(today=…, tomorrow=…)
+    例: CalendarWindow(today=…, next_day=…)
         → (
             DisplayDay(day=2026-05-29, header="今日（5/29金）", section="today", events=(…,)),
-            DisplayDay(day=2026-05-30, header="明日（5/30土）", section="tomorrow", events=(…,)),
+            DisplayDay(day=2026-06-02, header="3日後（6/2月）", section="secondary", events=(…,)),
           )
     """
+    reference_today = calendar.today.day
     return (
-        _display_day_from_schedule(calendar.today, "today"),
-        _display_day_from_schedule(calendar.tomorrow, "tomorrow"),
+        _display_day_from_schedule(calendar.today, "today", reference_today),
+        _display_day_from_schedule(calendar.next_day, "secondary", reference_today),
     )
 
 
-def _display_day_from_schedule(schedule: DaySchedule, section: Section) -> DisplayDay:
+def _display_day_from_schedule(
+    schedule: DaySchedule,
+    section: Section,
+    reference_today: date,
+) -> DisplayDay:
     return DisplayDay(
         day=schedule.day,
-        header=_format_date_header(schedule.day, section),
+        header=_format_date_header(schedule.day, section, reference_today),
         section=section,
         events=tuple(_display_event_from_calendar(event) for event in schedule.events),
     )
@@ -216,11 +221,15 @@ def _build_lines(display_days: tuple[DisplayDay, ...]) -> list[RenderLine]:
     return lines
 
 
-def _format_date_header(day: date, section: Section) -> str:
+def _format_date_header(day: date, section: Section, reference_today: date) -> str:
     weekdays = ("月", "火", "水", "木", "金", "土", "日")
     date_text = f"{day.month}/{day.day}{weekdays[day.weekday()]}"
-    label = "今日" if section == "today" else "明日"
-    return f"{label}（{date_text}）"
+    if section == "today":
+        return f"今日（{date_text}）"
+    delta_days = (day - reference_today).days
+    if delta_days == 1:
+        return f"明日（{date_text}）"
+    return f"{delta_days}日後（{date_text}）"
 
 
 # --- 予定行: 「予定名」+「（時刻）」を横並び ---
@@ -344,7 +353,7 @@ def _draw_day_divider(draw: ImageDraw.ImageDraw, y: int) -> None:
 
 
 def _fonts_for_section(fonts: RenderFonts, section: Section) -> DayFonts:
-    return fonts.tomorrow if section == "tomorrow" else fonts.today
+    return fonts.secondary if section == "secondary" else fonts.today
 
 
 def _load_fonts(regular_path: Path | None, bold_path: Path | None) -> RenderFonts:
@@ -352,7 +361,7 @@ def _load_fonts(regular_path: Path | None, bold_path: Path | None) -> RenderFont
         default = ImageFont.load_default()
         events = EventFonts(time=default, title=default)
         day = DayFonts(date=default, events=events)
-        return RenderFonts(today=day, tomorrow=day)
+        return RenderFonts(today=day, secondary=day)
 
     def _day_fonts(path: str) -> DayFonts:
         return DayFonts(
@@ -365,7 +374,7 @@ def _load_fonts(regular_path: Path | None, bold_path: Path | None) -> RenderFont
 
     regular = str(regular_path)
     bold = str(bold_path or regular_path)
-    return RenderFonts(today=_day_fonts(bold), tomorrow=_day_fonts(regular))
+    return RenderFonts(today=_day_fonts(bold), secondary=_day_fonts(regular))
 
 
 def _find_font_path(candidates: tuple[Path, ...]) -> Path | None:

@@ -14,7 +14,9 @@ from tests.factories import (
     FakeResponse,
     ICS_URL_A,
     ICS_URL_B,
+    REFERENCE_DAY_PLUS_3,
     REFERENCE_TODAY,
+    REFERENCE_TOMORROW,
     assert_window_event_uids,
     make_all_day_event,
     make_empty_window,
@@ -75,6 +77,17 @@ END:VEVENT
 END:VCALENDAR
 """
 
+SKIP_TOMORROW_ICS = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:later
+SUMMARY:明後日以降
+DTSTART;TZID=Asia/Tokyo:20260601T100000
+DTEND;TZID=Asia/Tokyo:20260601T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
 
 def test_fetch_icals_returns_models_in_url_order(monkeypatch: pytest.MonkeyPatch) -> None:
     urls = (ICS_URL_A, ICS_URL_B)
@@ -111,7 +124,7 @@ def test_fetch_icals_fails_when_one_url_fails(monkeypatch: pytest.MonkeyPatch) -
         fetch_icals(urls)
 
 
-def test_parse_icals_returns_today_and_tomorrow_frames() -> None:
+def test_parse_icals_returns_today_and_next_day_frames() -> None:
     assert parse_icals((), REFERENCE_TODAY) == make_empty_window()
 
 
@@ -124,10 +137,11 @@ def test_parse_icals_extracts_overlapping_events_and_sorts_deterministically() -
         REFERENCE_TODAY,
     )
 
+    assert window.next_day.day == REFERENCE_TOMORROW
     assert_window_event_uids(
         window,
         today=("same-a", "same-b", "night", "early"),
-        tomorrow=("night", "tomorrow"),
+        next_day=("night", "tomorrow"),
     )
 
 
@@ -136,4 +150,29 @@ def test_parse_icals_normalizes_all_day_events_to_jst_day_range() -> None:
 
     window = parse_icals((make_fetched_ical(ALL_DAY_ICS),), REFERENCE_TODAY)
 
-    assert window == make_window(tomorrow_events=(all_day,))
+    assert window == make_window(next_day_events=(all_day,))
+
+
+def test_parse_icals_skips_empty_days_to_next_event_day() -> None:
+    window = parse_icals((make_fetched_ical(SKIP_TOMORROW_ICS),), REFERENCE_TODAY)
+
+    assert window.next_day.day == REFERENCE_DAY_PLUS_3
+    assert tuple(event.uid for event in window.next_day.events) == ("later",)
+
+
+def test_parse_icals_falls_back_to_empty_tomorrow_when_no_future_events() -> None:
+    today_only_ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:today-only
+SUMMARY:今日だけ
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
+    window = parse_icals((make_fetched_ical(today_only_ics),), REFERENCE_TODAY)
+
+    assert window.next_day.day == REFERENCE_TOMORROW
+    assert window.next_day.events == ()
