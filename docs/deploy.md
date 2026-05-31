@@ -43,17 +43,13 @@ Ubuntu / Debian:
 sudo apt install -y fonts-noto-cjk
 ```
 
-RHEL / AlmaLinux / Rocky 8:
+RHEL / AlmaLinux / Rocky:
 
 ```bash
 sudo dnf install -y google-noto-sans-cjk-ttc-fonts
 ```
 
-RHEL / AlmaLinux / Rocky 9 以降:
-
-```bash
-sudo dnf install -y google-noto-sans-cjk-fonts
-```
+`google-noto-sans-cjk-ttc-fonts` が無い OS（例: EL10 以降）では `google-noto-sans-cjk-fonts` を入れる。
 
 
 

@@ -67,8 +67,8 @@ BOLD_FONT_PATHS = (
     Path("/System/Library/Fonts/Supplemental/AppleGothic.ttf"),
     Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
     Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"),
-    Path("/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Bold.ttc"),
     Path("/usr/share/fonts/google-noto-cjk/NotoSansCJK-Bold.ttc"),
+    Path("/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Bold.ttc"),
 )
 REGULAR_FONT_PATHS = (
     Path("/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc"),
@@ -76,8 +76,8 @@ REGULAR_FONT_PATHS = (
     Path("/System/Library/Fonts/Supplemental/AppleGothic.ttf"),
     Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
     Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
-    Path("/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Regular.ttc"),
     Path("/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc"),
+    Path("/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Regular.ttc"),
 )
 
 
