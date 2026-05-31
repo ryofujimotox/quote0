@@ -41,44 +41,53 @@ class DisplayDay:
     events: tuple[DisplayEvent, ...]
 
 
-# Dot 表示領域（デバイス要件に合わせて固定）
-WIDTH = 296
-HEIGHT = 152
-MARGIN = 6
-LINE_GAP = 2
-EVENT_INDENT = 6
-DIVIDER_TOP_PAD = 4
-DIVIDER_BOTTOM_PAD = 4
+# --- 描画サイズ ---
+# 調整は *_PT を変える。Pillow 描画は RENDER_DPI で px に換算する。
+# キャンバスだけ Dot デバイス要件の px 固定。
 
-# サイズは揃え、先頭ブロックだけ太字
-DATE_FONT_SIZE = 20
-TIME_FONT_SIZE = 20
-TITLE_FONT_SIZE = 20
+RENDER_DPI = 96.0
+
+
+def _px(pt: float) -> int:
+    """pt → Pillow 描画用 px（四捨五入）。"""
+    return round(pt * RENDER_DPI / 72.0)
+
+
+# キャンバス（px 固定）
+CANVAS_WIDTH = 296
+CANVAS_HEIGHT = 152
+
+# 余白・行間（pt）
+EVENT_INDENT_PT = 4.5  # 予定行の左インデント（日付見出しより右）
+DIVIDER_PAD_PT = 1.5  # 区切り線の上下余白
+DIVIDER_WIDTH_PT = 1.5  # 区切り線の太さ
+
+# フォント（pt）。太字/通常は字体ファイル（Regular / Bold）で切り替え
+DATE_FONT_PT = 15.0
+TIME_FONT_PT = 15.0
+TITLE_FONT_PT = 15.0
+
+# px 換算（描画コードはこちらを参照）
+WIDTH = CANVAS_WIDTH
+HEIGHT = CANVAS_HEIGHT
+EVENT_INDENT = _px(EVENT_INDENT_PT)
+DIVIDER_PAD = _px(DIVIDER_PAD_PT)
+DIVIDER_WIDTH = _px(DIVIDER_WIDTH_PT)
+DATE_FONT_SIZE = _px(DATE_FONT_PT)
+TIME_FONT_SIZE = _px(TIME_FONT_PT)
+TITLE_FONT_SIZE = _px(TITLE_FONT_PT)
+# 予定行の描画幅 = キャンバス幅 − 左インデント
+EVENT_LINE_WIDTH = WIDTH - EVENT_INDENT
 
 BACKGROUND = (250, 250, 247)
 INK = (30, 34, 40)
 ACCENT = (39, 98, 166)
 DIVIDER = (90, 96, 108)
-DIVIDER_WIDTH = 2
 
-# macOS / Linux で見つかりやすい順（先頭が使われる）。日本語非対応フォントは候補に入れない
-BOLD_FONT_PATHS = (
-    Path("/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc"),
-    Path("/System/Library/Fonts/Supplemental/AppleGothic.ttf"),
-    Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
-    Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"),
-    Path("/usr/share/fonts/google-noto-cjk/NotoSansCJK-Bold.ttc"),
-    Path("/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Bold.ttc"),
-)
-REGULAR_FONT_PATHS = (
-    Path("/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc"),
-    Path("/System/Library/Fonts/AppleSDGothicNeo.ttc"),
-    Path("/System/Library/Fonts/Supplemental/AppleGothic.ttf"),
-    Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
-    Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
-    Path("/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc"),
-    Path("/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Regular.ttc"),
-)
+# 環境差を避けるため、パッケージ同梱の Noto Sans JP のみ使う（handy_calendar/fonts/）
+_FONTS_DIR = Path(__file__).resolve().parent.parent / "fonts"
+REGULAR_FONT_PATH = _FONTS_DIR / "NotoSansJP-Regular.otf"
+BOLD_FONT_PATH = _FONTS_DIR / "NotoSansJP-Bold.otf"
 
 
 # --- 描画行（上からこの順で並べる） ---
@@ -167,17 +176,16 @@ def render_png(calendar: CalendarWindow) -> PngImage:
         "PNG 生成: "
         f"{display_days[0].day.isoformat()} / {display_days[1].day.isoformat()}"
     )
-    regular_path = _find_font_path(_regular_font_candidates())
-    bold_path = _find_font_path(_bold_font_candidates())
+    regular_path, bold_path = _resolve_font_paths()
     fonts = _load_fonts(regular_path, bold_path)
     lines = _build_lines(display_days)
-    event_left = MARGIN + EVENT_INDENT
-    event_width = WIDTH - MARGIN - event_left
-    y_limit = HEIGHT - MARGIN
+    event_left = EVENT_INDENT
+    event_width = EVENT_LINE_WIDTH
+    y_limit = HEIGHT
 
     image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
-    y = MARGIN
+    y = 0
     for line in lines:
         # 高さ超過後も描くと下端が切れるので、次行を描く前に打ち切る
         if y >= y_limit:
@@ -188,7 +196,7 @@ def render_png(calendar: CalendarWindow) -> PngImage:
         elif isinstance(line, DateHeaderLine):
             day_fonts = _fonts_for_emphasis(fonts, line.emphasized)
             draw.text(
-                (MARGIN, y),
+                (0, y),
                 line.header,
                 fill=ACCENT,
                 font=day_fonts.date,
@@ -340,8 +348,8 @@ def _build_time_suffix(
 
 
 def _draw_day_divider(draw: ImageDraw.ImageDraw, y: int) -> None:
-    line_y = y + DIVIDER_TOP_PAD
-    draw.line((MARGIN, line_y, WIDTH - MARGIN, line_y), fill=DIVIDER, width=DIVIDER_WIDTH)
+    line_y = y + DIVIDER_PAD
+    draw.line((0, line_y, WIDTH, line_y), fill=DIVIDER, width=DIVIDER_WIDTH)
 
 
 # --- フォント・計測 ---
@@ -366,25 +374,19 @@ def _load_fonts(regular_path: Path, bold_path: Path) -> RenderFonts:
     return RenderFonts(emphasis=_day_fonts(bold), regular=_day_fonts(regular))
 
 
-def _find_font_path(candidates: tuple[Path, ...]) -> Path:
-    path = next((candidate for candidate in candidates if candidate.exists()), None)
-    if path is None:
-        raise HandyCalendarError("PNG 生成失敗 reason=japanese_font_missing")
-    return path
-
-
-def _regular_font_candidates() -> tuple[Path, ...]:
-    hiragino = tuple(sorted(Path("/System/Library/Fonts").glob("ヒラ*角*W4.ttc")))
-    return (*hiragino, *REGULAR_FONT_PATHS)
-
-
-def _bold_font_candidates() -> tuple[Path, ...]:
-    hiragino = tuple(sorted(Path("/System/Library/Fonts").glob("ヒラ*角*W6.ttc")))
-    return (*hiragino, *BOLD_FONT_PATHS)
+def _resolve_font_paths() -> tuple[Path, Path]:
+    """同梱フォントの存在を確認し、Regular / Bold のパスを返す。"""
+    missing = [path for path in (REGULAR_FONT_PATH, BOLD_FONT_PATH) if not path.exists()]
+    if missing:
+        raise HandyCalendarError(
+            "PNG 生成失敗 reason=bundled_font_missing "
+            + " ".join(f"path={path}" for path in missing)
+        )
+    return REGULAR_FONT_PATH, BOLD_FONT_PATH
 
 
 def _divider_height() -> int:
-    return DIVIDER_TOP_PAD + DIVIDER_WIDTH + DIVIDER_BOTTOM_PAD
+    return DIVIDER_PAD + DIVIDER_WIDTH + DIVIDER_PAD
 
 
 def _line_height_for(line: RenderLine, fonts: RenderFonts) -> int:
@@ -399,7 +401,7 @@ def _line_height_for(line: RenderLine, fonts: RenderFonts) -> int:
 
 def _line_height(font: ImageFont.ImageFont) -> int:
     ascent, descent = font.getmetrics()
-    return ascent + descent + LINE_GAP
+    return ascent + descent
 
 
 def _text_width(text: str, font: ImageFont.ImageFont) -> int:
