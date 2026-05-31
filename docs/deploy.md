@@ -15,6 +15,7 @@
 | 実行 | 毎日 **0:00 JST** に cron で `.venv/bin/python -m handy_calendar` を実行 | 手動実行は「動作確認」 |
 | 秘密情報 | `.env` | [AGENTS.md](../AGENTS.md) の「設定（環境変数）」。作成・設定は「環境変数（`.env`）」 |
 | Python | ホスト **3.12**（`.python-version`） | `python3.12` が無いときは「Python 3.12 のインストール」 |
+| 日本語フォント | **Noto CJK** 等（PNG 描画に必要） | Linux では「セットアップ」の「日本語フォント」 |
 
 
 
@@ -31,6 +32,24 @@ python3.12 -m venv .venv
 .venv/bin/pip install -U pip
 .venv/bin/pip install -r requirements.txt
 ```
+
+
+
+### 日本語フォント
+
+Ubuntu / Debian:
+
+```bash
+sudo apt install -y fonts-noto-cjk
+```
+
+RHEL / AlmaLinux / Rocky:
+
+```bash
+sudo dnf install -y google-noto-sans-cjk-ttc-fonts
+```
+
+`google-noto-sans-cjk-ttc-fonts` が無い OS（例: EL10 以降）では `google-noto-sans-cjk-fonts` を入れる。
 
 
 
