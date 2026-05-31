@@ -41,10 +41,10 @@ from tests.factories import (
 )
 
 
-def test_format_date_header_includes_section_and_weekday() -> None:
-    assert _format_date_header(REFERENCE_TODAY, "today", REFERENCE_TODAY) == "今日（5/29金）"
-    assert _format_date_header(REFERENCE_TOMORROW, "secondary", REFERENCE_TODAY) == "明日（5/30土）"
-    assert _format_date_header(REFERENCE_DAY_PLUS_3, "secondary", REFERENCE_TODAY) == "3日後（6/1月）"
+def test_format_date_header_uses_reference_today_and_weekday() -> None:
+    assert _format_date_header(REFERENCE_TODAY, REFERENCE_TODAY) == "今日（5/29金）"
+    assert _format_date_header(REFERENCE_TOMORROW, REFERENCE_TODAY) == "明日（5/30土）"
+    assert _format_date_header(REFERENCE_DAY_PLUS_3, REFERENCE_TODAY) == "3日後（6/1月）"
 
 
 def test_build_display_days_converts_timed_events() -> None:
@@ -56,13 +56,11 @@ def test_build_display_days_converts_timed_events() -> None:
         display_day(
             day=REFERENCE_TODAY,
             header="今日（5/29金）",
-            section="today",
             events=(timed_display(today_event, "（10:00~10:30）"),),
         ),
         display_day(
             day=REFERENCE_TOMORROW,
             header="明日（5/30土）",
-            section="secondary",
             events=(timed_display(next_day_event, "（15:00~16:00）"),),
         ),
     )
@@ -77,7 +75,6 @@ def test_build_display_days_omits_time_suffix_for_all_day_event() -> None:
         display_day(
             day=REFERENCE_TOMORROW,
             header="明日（5/30土）",
-            section="secondary",
             events=(all_day_display(all_day),),
         ),
     )
@@ -97,7 +94,6 @@ def test_build_display_days_uses_days_after_label_for_skipped_days() -> None:
     _, next_block = build_display_days(window)
 
     assert next_block.header == "3日後（6/1月）"
-    assert next_block.section == "secondary"
 
 
 def test_build_display_days_keeps_event_order() -> None:
@@ -110,7 +106,6 @@ def test_build_display_days_keeps_event_order() -> None:
     assert today_block == display_day(
         day=REFERENCE_TODAY,
         header="今日（5/29金）",
-        section="today",
         events=(
             timed_display(first, "（09:00~09:30）"),
             timed_display(second, "（10:00~10:30）"),
@@ -124,18 +119,18 @@ def test_build_lines_interleaves_headers_events_and_divider() -> None:
     today_block, next_day_block = build_display_days(window)
 
     assert _build_lines((today_block, next_day_block)) == [
-        DateHeaderLine("今日（5/29金）", "today"),
-        EventLine(today_block.events[0], "today"),
+        DateHeaderLine("今日（5/29金）", emphasized=True),
+        EventLine(today_block.events[0], emphasized=True),
         DayDividerLine(),
-        DateHeaderLine("明日（5/30土）", "secondary"),
-        EventLine(next_day_block.events[0], "secondary"),
+        DateHeaderLine("明日（5/30土）", emphasized=False),
+        EventLine(next_day_block.events[0], emphasized=False),
     ]
 
 
 def test_fit_title_and_time_keeps_short_title_and_full_time(render_fonts) -> None:
     event = make_timed_event("short", title="短い", start=(10, 0), end=(10, 30))
 
-    assert _fit_title_and_time(event, render_fonts.today.events, EVENT_LINE_WIDTH) == (
+    assert _fit_title_and_time(event, render_fonts.emphasis.events, EVENT_LINE_WIDTH) == (
         "短い",
         "（10:00~10:30）",
     )
@@ -149,7 +144,7 @@ def test_fit_title_and_time_truncates_long_title_but_keeps_start_time(render_fon
         end=(10, 30),
     )
 
-    title, suffix = _fit_title_and_time(event, render_fonts.today.events, EVENT_LINE_WIDTH)
+    title, suffix = _fit_title_and_time(event, render_fonts.emphasis.events, EVENT_LINE_WIDTH)
 
     assert title.endswith("…")
     assert suffix.startswith("（10:00")
@@ -159,7 +154,7 @@ def test_fit_title_and_time_truncates_long_title_but_keeps_start_time(render_fon
 def test_fit_title_and_time_truncates_title_and_time_when_width_is_narrow(render_fonts) -> None:
     event = make_timed_event("garbage", title="燃えるゴミテスト", start=(10, 0), end=(10, 30))
 
-    assert _fit_title_and_time(event, render_fonts.today.events, 150) == (
+    assert _fit_title_and_time(event, render_fonts.emphasis.events, 150) == (
         "燃…",
         "（10:00~",
     )
@@ -168,23 +163,23 @@ def test_fit_title_and_time_truncates_title_and_time_when_width_is_narrow(render
 def test_fit_title_and_time_keeps_full_title_and_start_time_with_regular_font(render_fonts) -> None:
     event = make_timed_event("garbage-full", title="燃えるゴミテスト", start=(10, 0), end=(10, 30))
 
-    assert _fit_title_and_time(event, render_fonts.secondary.events, EVENT_LINE_WIDTH) == (
+    assert _fit_title_and_time(event, render_fonts.regular.events, EVENT_LINE_WIDTH) == (
         "燃えるゴミテスト",
         "（10:00~",
     )
 
 
-def test_load_fonts_uses_bold_for_today_and_regular_for_secondary() -> None:
+def test_load_fonts_uses_bold_for_emphasis_and_regular_for_second_block() -> None:
     regular_path = next(path for path in _regular_font_candidates() if path.exists())
     bold_path = next(path for path in _bold_font_candidates() if path.exists())
     fonts = _load_fonts(regular_path, bold_path)
 
-    assert fonts.today.date.size == DATE_FONT_SIZE == 20
-    assert fonts.today.events.time.size == TIME_FONT_SIZE == 20
-    assert fonts.today.events.title.size == TITLE_FONT_SIZE == 20
-    assert fonts.secondary.events.time.size == TIME_FONT_SIZE
-    assert fonts.secondary.events.title.size == TITLE_FONT_SIZE
-    assert fonts.today.events.title != fonts.secondary.events.title
+    assert fonts.emphasis.date.size == DATE_FONT_SIZE == 20
+    assert fonts.emphasis.events.time.size == TIME_FONT_SIZE == 20
+    assert fonts.emphasis.events.title.size == TITLE_FONT_SIZE == 20
+    assert fonts.regular.events.time.size == TIME_FONT_SIZE
+    assert fonts.regular.events.title.size == TITLE_FONT_SIZE
+    assert fonts.emphasis.events.title != fonts.regular.events.title
 
 
 def test_render_png_is_deterministic() -> None:

@@ -5,14 +5,11 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta
 from email.message import Message
-from typing import Literal
 
 from handy_calendar.config import AppConfig
 from handy_calendar.models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, FetchedIcal, JST, PngImage
 from handy_calendar.steps.ical import day_range
 from handy_calendar.steps.render import DisplayDay, DisplayEvent
-
-DisplaySection = Literal["today", "secondary"]
 
 # テスト全体で基準日を揃える（2026-05-29 = 金曜）
 REFERENCE_TODAY = date(2026, 5, 29)
@@ -118,7 +115,7 @@ def make_fetched_ical(
 
 
 def make_window_with_timed_events() -> CalendarWindow:
-    """build_display_days / _build_lines で使う代表例（今日・明日に 1 件ずつ）。"""
+    """build_display_days / _build_lines で使う代表例（今日・次の予定日に 1 件ずつ）。"""
     return make_window(
         today_events=(make_timed_event("today", start=(10, 0), end=(10, 30)),),
         next_day_events=(
@@ -131,10 +128,9 @@ def display_day(
     *,
     day: date,
     header: str,
-    section: DisplaySection,
     events: tuple[DisplayEvent, ...] = (),
 ) -> DisplayDay:
-    return DisplayDay(day=day, header=header, section=section, events=events)
+    return DisplayDay(day=day, header=header, events=events)
 
 
 def timed_display(event: CalendarEvent, time_suffix: str) -> DisplayEvent:
@@ -146,7 +142,7 @@ def all_day_display(event: CalendarEvent) -> DisplayEvent:
 
 
 def empty_today_display_day() -> DisplayDay:
-    return display_day(day=REFERENCE_TODAY, header="今日（5/29金）", section="today")
+    return display_day(day=REFERENCE_TODAY, header="今日（5/29金）")
 
 
 def empty_next_day_display_day(
@@ -154,7 +150,7 @@ def empty_next_day_display_day(
     day: date = REFERENCE_TOMORROW,
     header: str = "明日（5/30土）",
 ) -> DisplayDay:
-    return display_day(day=day, header=header, section="secondary")
+    return display_day(day=day, header=header)
 
 
 def assert_window_event_uids(

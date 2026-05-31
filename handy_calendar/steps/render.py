@@ -8,7 +8,7 @@
     …
 
 予定行の省略優先度: 開始時刻 → 予定名 → 終了時刻
-下端ははみ出してよい（明日の予定が一部見切れても可）。
+下端ははみ出してよい（2 枠目の予定が一部見切れても可）。
 """
 
 from __future__ import annotations
@@ -17,13 +17,10 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Literal
 
 from PIL import Image, ImageDraw, ImageFont
 
 from ..models import CalendarEvent, CalendarWindow, DaySchedule, PngImage
-
-Section = Literal["today", "secondary"]
 
 
 @dataclass(frozen=True)
@@ -40,7 +37,6 @@ class DisplayDay:
 
     day: date
     header: str
-    section: Section
     events: tuple[DisplayEvent, ...]
 
 
@@ -53,7 +49,7 @@ EVENT_INDENT = 6
 DIVIDER_TOP_PAD = 4
 DIVIDER_BOTTOM_PAD = 4
 
-# サイズは揃え、今日ブロックだけ太字（2 枠目は通常ウェイト）
+# サイズは揃え、先頭ブロックだけ太字
 DATE_FONT_SIZE = 20
 TIME_FONT_SIZE = 20
 TITLE_FONT_SIZE = 20
@@ -90,7 +86,7 @@ class DateHeaderLine:
     """例: 今日（5/29金）"""
 
     header: str
-    section: Section
+    emphasized: bool
 
 
 @dataclass(frozen=True)
@@ -98,12 +94,12 @@ class EventLine:
     """例: 打合せ（10:00~11:00）の元データ"""
 
     display_event: DisplayEvent
-    section: Section
+    emphasized: bool
 
 
 @dataclass(frozen=True)
 class DayDividerLine:
-    """今日ブロックと2枠目ブロックの間の横線"""
+    """1 枠目と 2 枠目の間の横線"""
 
 
 @dataclass(frozen=True)
@@ -120,8 +116,8 @@ class DayFonts:
 
 @dataclass(frozen=True)
 class RenderFonts:
-    today: DayFonts
-    secondary: DayFonts
+    emphasis: DayFonts
+    regular: DayFonts
 
 
 RenderLine = DateHeaderLine | EventLine | DayDividerLine
@@ -132,26 +128,21 @@ def build_display_days(calendar: CalendarWindow) -> tuple[DisplayDay, ...]:
 
     例: CalendarWindow(today=…, next_day=…)
         → (
-            DisplayDay(day=2026-05-29, header="今日（5/29金）", section="today", events=(…,)),
-            DisplayDay(day=2026-06-02, header="3日後（6/2月）", section="secondary", events=(…,)),
+            DisplayDay(day=2026-05-29, header="今日（5/29金）", events=(…,)),
+            DisplayDay(day=2026-06-02, header="3日後（6/2月）", events=(…,)),
           )
     """
     reference_today = calendar.today.day
     return (
-        _display_day_from_schedule(calendar.today, "today", reference_today),
-        _display_day_from_schedule(calendar.next_day, "secondary", reference_today),
+        _display_day_from_schedule(calendar.today, reference_today),
+        _display_day_from_schedule(calendar.next_day, reference_today),
     )
 
 
-def _display_day_from_schedule(
-    schedule: DaySchedule,
-    section: Section,
-    reference_today: date,
-) -> DisplayDay:
+def _display_day_from_schedule(schedule: DaySchedule, reference_today: date) -> DisplayDay:
     return DisplayDay(
         day=schedule.day,
-        header=_format_date_header(schedule.day, section, reference_today),
-        section=section,
+        header=_format_date_header(schedule.day, reference_today),
         events=tuple(_display_event_from_calendar(event) for event in schedule.events),
     )
 
@@ -192,7 +183,7 @@ def render_png(calendar: CalendarWindow) -> PngImage:
         if isinstance(line, DayDividerLine):
             _draw_day_divider(draw, y)
         elif isinstance(line, DateHeaderLine):
-            day_fonts = _fonts_for_section(fonts, line.section)
+            day_fonts = _fonts_for_emphasis(fonts, line.emphasized)
             draw.text(
                 (MARGIN, y),
                 line.header,
@@ -200,7 +191,7 @@ def render_png(calendar: CalendarWindow) -> PngImage:
                 font=day_fonts.date,
             )
         else:
-            day_fonts = _fonts_for_section(fonts, line.section)
+            day_fonts = _fonts_for_emphasis(fonts, line.emphasized)
             _draw_event_line(draw, y, line.display_event, day_fonts.events, event_left, event_width)
         y += line_height
 
@@ -213,18 +204,19 @@ def _build_lines(display_days: tuple[DisplayDay, ...]) -> list[RenderLine]:
     """日ブロック列 → 区切り線付きの描画行リスト。"""
     lines: list[RenderLine] = []
     for index, display_day in enumerate(display_days):
-        lines.append(DateHeaderLine(display_day.header, display_day.section))
+        emphasized = index == 0
+        lines.append(DateHeaderLine(display_day.header, emphasized))
         for display_event in display_day.events:
-            lines.append(EventLine(display_event, display_day.section))
+            lines.append(EventLine(display_event, emphasized))
         if index < len(display_days) - 1:
             lines.append(DayDividerLine())
     return lines
 
 
-def _format_date_header(day: date, section: Section, reference_today: date) -> str:
+def _format_date_header(day: date, reference_today: date) -> str:
     weekdays = ("月", "火", "水", "木", "金", "土", "日")
     date_text = f"{day.month}/{day.day}{weekdays[day.weekday()]}"
-    if section == "today":
+    if day == reference_today:
         return f"今日（{date_text}）"
     delta_days = (day - reference_today).days
     if delta_days == 1:
@@ -352,8 +344,8 @@ def _draw_day_divider(draw: ImageDraw.ImageDraw, y: int) -> None:
 # --- フォント・計測 ---
 
 
-def _fonts_for_section(fonts: RenderFonts, section: Section) -> DayFonts:
-    return fonts.secondary if section == "secondary" else fonts.today
+def _fonts_for_emphasis(fonts: RenderFonts, emphasized: bool) -> DayFonts:
+    return fonts.emphasis if emphasized else fonts.regular
 
 
 def _load_fonts(regular_path: Path | None, bold_path: Path | None) -> RenderFonts:
@@ -361,7 +353,7 @@ def _load_fonts(regular_path: Path | None, bold_path: Path | None) -> RenderFont
         default = ImageFont.load_default()
         events = EventFonts(time=default, title=default)
         day = DayFonts(date=default, events=events)
-        return RenderFonts(today=day, secondary=day)
+        return RenderFonts(emphasis=day, regular=day)
 
     def _day_fonts(path: str) -> DayFonts:
         return DayFonts(
@@ -374,7 +366,7 @@ def _load_fonts(regular_path: Path | None, bold_path: Path | None) -> RenderFont
 
     regular = str(regular_path)
     bold = str(bold_path or regular_path)
-    return RenderFonts(today=_day_fonts(bold), secondary=_day_fonts(regular))
+    return RenderFonts(emphasis=_day_fonts(bold), regular=_day_fonts(regular))
 
 
 def _find_font_path(candidates: tuple[Path, ...]) -> Path | None:
@@ -398,7 +390,7 @@ def _divider_height() -> int:
 def _line_height_for(line: RenderLine, fonts: RenderFonts) -> int:
     if isinstance(line, DayDividerLine):
         return _divider_height()
-    day_fonts = _fonts_for_section(fonts, line.section)
+    day_fonts = _fonts_for_emphasis(fonts, line.emphasized)
     if isinstance(line, DateHeaderLine):
         return _line_height(day_fonts.date)
     # 予定行は title / time の大きい方に合わせる
