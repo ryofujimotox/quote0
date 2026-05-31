@@ -63,10 +63,16 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
     return tuple(fetched)
 
 
-def parse_icals(calendars: tuple[FetchedIcal, ...], today: date) -> CalendarWindow:
+def parse_icals(
+    calendars: tuple[FetchedIcal, ...],
+    today: date,
+    *,
+    reference_now: datetime | None = None,
+) -> CalendarWindow:
     """取得済み ICS から今日・次の予定日の予定を抽出する。
 
     2 枠目は today より後で最初に予定がある日。見つからなければ翌日の空枠。
+    reference_now より前に終了した予定は各日枠から除く。
 
     例: calendars=(FetchedIcal(0, "https://…", "BEGIN:VCALENDAR…"),), today=2026-05-29
         → CalendarWindow(
@@ -74,6 +80,7 @@ def parse_icals(calendars: tuple[FetchedIcal, ...], today: date) -> CalendarWind
             next_day=DaySchedule(2026-05-31, period=31日0時〜6/1 0時, events=()),
           )
     """
+    now = reference_now or datetime.now(JST)
     print(f"iCal 解析: {len(calendars)}件", flush=True)
     today_period = day_range(today)
     events = _sorted_events(
@@ -91,11 +98,15 @@ def parse_icals(calendars: tuple[FetchedIcal, ...], today: date) -> CalendarWind
     next_day = _find_next_event_day(events, today)
     next_day_period = day_range(next_day)
     return CalendarWindow(
-        today=DaySchedule(day=today, period=today_period, events=_events_for_day(events, today_period)),
+        today=DaySchedule(
+            day=today,
+            period=today_period,
+            events=_events_still_active(_events_for_day(events, today_period), now),
+        ),
         next_day=DaySchedule(
             day=next_day,
             period=next_day_period,
-            events=_events_for_day(events, next_day_period),
+            events=_events_still_active(_events_for_day(events, next_day_period), now),
         ),
     )
 
@@ -217,3 +228,8 @@ def _sorted_events(events: Iterable[CalendarEvent]) -> tuple[CalendarEvent, ...]
 
 def _events_for_day(events: tuple[CalendarEvent, ...], period: DateRange) -> tuple[CalendarEvent, ...]:
     return tuple(event for event in events if period.overlaps(event.period))
+
+
+def _events_still_active(events: tuple[CalendarEvent, ...], now: datetime) -> tuple[CalendarEvent, ...]:
+    """終了時刻を過ぎた予定を除く（進行中・未開始は残す）。"""
+    return tuple(event for event in events if event.period.end > now)
