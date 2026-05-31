@@ -22,7 +22,13 @@ def main() -> int:
         config = load_config()
         today = today_in_jst()
         calendars = fetch_icals(config.ical_urls)
+        print(f"iCal 取得完了: {len(calendars)}件", flush=True)
         calendar = parse_icals(calendars, today)
+        print(
+            "iCal 解析完了: "
+            f"today={len(calendar.today.events)}件, tomorrow={len(calendar.tomorrow.events)}件",
+            flush=True,
+        )
         image = render_png(calendar)
         send_dot_image(config, image)
     except HandyCalendarError as exc:
