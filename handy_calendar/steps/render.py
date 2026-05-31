@@ -20,6 +20,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from ..errors import HandyCalendarError
 from ..models import CalendarEvent, CalendarWindow, DaySchedule, PngImage
 
 
@@ -60,13 +61,14 @@ ACCENT = (39, 98, 166)
 DIVIDER = (90, 96, 108)
 DIVIDER_WIDTH = 2
 
-# macOS / Linux で見つかりやすい順（先頭が使われる）。太字が無い環境は通常ウェイトへフォールバック
+# macOS / Linux で見つかりやすい順（先頭が使われる）。日本語非対応フォントは候補に入れない
 BOLD_FONT_PATHS = (
     Path("/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc"),
     Path("/System/Library/Fonts/Supplemental/AppleGothic.ttf"),
     Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
     Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"),
-    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+    Path("/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Bold.ttc"),
+    Path("/usr/share/fonts/google-noto-cjk/NotoSansCJK-Bold.ttc"),
 )
 REGULAR_FONT_PATHS = (
     Path("/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc"),
@@ -74,7 +76,8 @@ REGULAR_FONT_PATHS = (
     Path("/System/Library/Fonts/Supplemental/AppleGothic.ttf"),
     Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
     Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
-    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    Path("/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Regular.ttc"),
+    Path("/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc"),
 )
 
 
@@ -348,13 +351,7 @@ def _fonts_for_emphasis(fonts: RenderFonts, emphasized: bool) -> DayFonts:
     return fonts.emphasis if emphasized else fonts.regular
 
 
-def _load_fonts(regular_path: Path | None, bold_path: Path | None) -> RenderFonts:
-    if regular_path is None:
-        default = ImageFont.load_default()
-        events = EventFonts(time=default, title=default)
-        day = DayFonts(date=default, events=events)
-        return RenderFonts(emphasis=day, regular=day)
-
+def _load_fonts(regular_path: Path, bold_path: Path) -> RenderFonts:
     def _day_fonts(path: str) -> DayFonts:
         return DayFonts(
             date=ImageFont.truetype(path, DATE_FONT_SIZE),
@@ -365,12 +362,15 @@ def _load_fonts(regular_path: Path | None, bold_path: Path | None) -> RenderFont
         )
 
     regular = str(regular_path)
-    bold = str(bold_path or regular_path)
+    bold = str(bold_path)
     return RenderFonts(emphasis=_day_fonts(bold), regular=_day_fonts(regular))
 
 
-def _find_font_path(candidates: tuple[Path, ...]) -> Path | None:
-    return next((path for path in candidates if path.exists()), None)
+def _find_font_path(candidates: tuple[Path, ...]) -> Path:
+    path = next((candidate for candidate in candidates if candidate.exists()), None)
+    if path is None:
+        raise HandyCalendarError("PNG 生成失敗 reason=japanese_font_missing")
+    return path
 
 
 def _regular_font_candidates() -> tuple[Path, ...]:

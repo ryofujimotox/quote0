@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 
 from PIL import Image
 
+import pytest
+
+from handy_calendar.errors import HandyCalendarError
 from handy_calendar.steps.render import (
     DATE_FONT_SIZE,
     TIME_FONT_SIZE,
@@ -16,6 +20,7 @@ from handy_calendar.steps.render import (
     _bold_font_candidates,
     _build_lines,
     _fit_title_and_time,
+    _find_font_path,
     _format_date_header,
     _load_fonts,
     _regular_font_candidates,
@@ -234,3 +239,8 @@ def test_render_png_outputs_fixed_canvas_size() -> None:
     with Image.open(BytesIO(image.content)) as rendered:
         assert rendered.size == (296, 152)
         assert rendered.getbbox() is not None
+
+
+def test_find_font_path_raises_when_japanese_font_missing() -> None:
+    with pytest.raises(HandyCalendarError, match="japanese_font_missing"):
+        _find_font_path((Path("/tmp/handy-calendar-missing-font.ttf"),))
