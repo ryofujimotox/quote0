@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from handy_calendar.errors import HandyCalendarError
 from handy_calendar import main as main_module
-from handy_calendar.models import CalendarWindow, DotSendResult, FetchedIcal, PngImage
+from handy_calendar.models import CalendarWindow, DotSendResult, FetchedIcal, JST, PngImage
 
 from tests.factories import ICS_URL_A, make_dot_config, make_empty_window
+
+BATCH_START = datetime(2026, 5, 29, 8, 0, tzinfo=JST)
 
 
 def test_main_runs_steps_in_order(monkeypatch) -> None:
@@ -16,18 +20,24 @@ def test_main_runs_steps_in_order(monkeypatch) -> None:
     image = PngImage(content=b"png", width=1, height=1)
     config = make_dot_config()
 
+    monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
     monkeypatch.setattr(main_module, "load_config", lambda: config)
-    monkeypatch.setattr(main_module, "today_in_jst", lambda: window.today.day)
 
     def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
         called.append("fetch")
         assert urls == config.ical_urls
         return fetched
 
-    def parse_icals(calendars: tuple[FetchedIcal, ...], today) -> CalendarWindow:
+    def parse_icals(
+        calendars: tuple[FetchedIcal, ...],
+        today,
+        *,
+        reference_now=None,
+    ) -> CalendarWindow:
         called.append("parse")
         assert calendars == fetched
         assert today == window.today.day
+        assert reference_now == BATCH_START
         return window
 
     def render_png(calendar: CalendarWindow) -> PngImage:
@@ -50,12 +60,43 @@ def test_main_runs_steps_in_order(monkeypatch) -> None:
     assert called == ["fetch", "parse", "render", "send"]
 
 
+def test_main_passes_batch_start_before_fetch(monkeypatch) -> None:
+    """取得前に固定した started_at を today と reference_now の両方に使う。"""
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
+    monkeypatch.setattr(main_module, "load_config", make_dot_config)
+    monkeypatch.setattr(
+        main_module,
+        "fetch_icals",
+        lambda _: (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),),
+    )
+    monkeypatch.setattr(main_module, "render_png", lambda _: PngImage(content=b"png", width=296, height=152))
+    monkeypatch.setattr(
+        main_module,
+        "send_dot_image",
+        lambda *_: DotSendResult(status_code=200, response_text="ok"),
+    )
+
+    def parse_icals(_calendars, today, *, reference_now=None) -> CalendarWindow:
+        captured["today"] = today
+        captured["reference_now"] = reference_now
+        return make_empty_window()
+
+    monkeypatch.setattr(main_module, "parse_icals", parse_icals)
+
+    assert main_module.main() == 0
+    assert captured == {
+        "today": BATCH_START.date(),
+        "reference_now": BATCH_START,
+    }
+
+
 def test_main_returns_non_zero_and_stops_when_step_fails(monkeypatch, capsys) -> None:
     called: list[str] = []
-    window = make_empty_window()
 
+    monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
     monkeypatch.setattr(main_module, "load_config", make_dot_config)
-    monkeypatch.setattr(main_module, "today_in_jst", lambda: window.today.day)
 
     def fetch_icals(_: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
         called.append("fetch")
@@ -74,14 +115,14 @@ def test_main_returns_non_zero_and_stops_when_step_fails(monkeypatch, capsys) ->
 def test_main_returns_non_zero_when_dot_send_fails(monkeypatch, capsys) -> None:
     window = make_empty_window()
 
+    monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
     monkeypatch.setattr(main_module, "load_config", make_dot_config)
-    monkeypatch.setattr(main_module, "today_in_jst", lambda: window.today.day)
     monkeypatch.setattr(
         main_module,
         "fetch_icals",
         lambda _: (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),),
     )
-    monkeypatch.setattr(main_module, "parse_icals", lambda *_: window)
+    monkeypatch.setattr(main_module, "parse_icals", lambda *_args, **_kwargs: window)
     monkeypatch.setattr(main_module, "render_png", lambda _: PngImage(content=b"png", width=296, height=152))
     monkeypatch.setattr(
         main_module,

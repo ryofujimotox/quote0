@@ -72,6 +72,7 @@ def parse_icals(
     """取得済み ICS から今日・次の予定日の予定を抽出する。
 
     2 枠目は today より後で最初に予定がある日。見つからなければ翌日の空枠。
+    reference_now はバッチ開始時点（main から渡す）。省略時は解析開始時点。
     reference_now より前に終了した予定は各日枠から除く。
 
     例: calendars=(FetchedIcal(0, "https://…", "BEGIN:VCALENDAR…"),), today=2026-05-29
