@@ -114,6 +114,38 @@ def test_build_display_days_keeps_event_order() -> None:
     assert next_day_block == empty_next_day_display_day()
 
 
+def test_build_display_days_shows_end_time_for_overnight_event() -> None:
+    overnight = make_timed_event(
+        "overnight",
+        title="日跨ぎ",
+        start=(23, 15),
+        end=(1, 15),
+        end_day=REFERENCE_TOMORROW,
+    )
+    window = make_window(today_events=(overnight,))
+
+    today_block, _ = build_display_days(window)
+
+    assert today_block.events[0].time_suffix == "（23:15~01:15）"
+
+
+def test_build_lines_always_includes_second_day_block_even_when_today_is_full() -> None:
+    events = tuple(
+        make_timed_event(
+            f"event-{index}",
+            start=(8 + index // 12, (index * 5) % 60),
+            end=(9 + index // 12, (index * 5) % 60),
+        )
+        for index in range(24)
+    )
+    window = make_window(today_events=events)
+    lines = _build_lines(build_display_days(window))
+
+    divider_idx = next(i for i, line in enumerate(lines) if isinstance(line, DayDividerLine))
+    assert isinstance(lines[divider_idx + 1], DateHeaderLine)
+    assert not lines[divider_idx + 1].emphasized
+
+
 def test_build_lines_interleaves_headers_events_and_divider() -> None:
     window = make_window_with_timed_events()
     today_block, next_day_block = build_display_days(window)

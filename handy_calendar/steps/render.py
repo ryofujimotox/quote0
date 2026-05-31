@@ -8,7 +8,7 @@
     …
 
 予定行の省略優先度: 開始時刻 → 予定名 → 終了時刻
-下端ははみ出してよい（2 枠目の予定が一部見切れても可）。
+2 枠目も描画行に含め、上から順に描く。下端はみ出して見切れてもよい。
 """
 
 from __future__ import annotations
@@ -164,10 +164,10 @@ def render_png(calendar: CalendarWindow) -> PngImage:
         "PNG 生成: "
         f"{display_days[0].day.isoformat()} / {display_days[1].day.isoformat()}"
     )
-    lines = _build_lines(display_days)
     regular_path = _find_font_path(_regular_font_candidates())
     bold_path = _find_font_path(_bold_font_candidates())
     fonts = _load_fonts(regular_path, bold_path)
+    lines = _build_lines(display_days)
     event_left = MARGIN + EVENT_INDENT
     event_width = WIDTH - MARGIN - event_left
     y_limit = HEIGHT - MARGIN
@@ -245,11 +245,11 @@ def _time_suffix_text(start_text: str, end_text: str | None, *, with_end: bool) 
 
 
 def _show_end_time(start: datetime, end: datetime) -> bool:
-    """同日で終了時刻が開始と異なるときだけ `~終了` を付ける。"""
+    """終了時刻を付けるか。同日差分があるとき、または翌日にまたがるとき True。"""
     if end <= start:
         return False
     if end.date() != start.date():
-        return False
+        return True
     return end.strftime("%H:%M") != start.strftime("%H:%M")
 
 

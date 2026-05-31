@@ -44,12 +44,13 @@ def make_timed_event(
     day: date = REFERENCE_TODAY,
     start: tuple[int, int] = (10, 0),
     end: tuple[int, int] = (11, 0),
+    end_day: date | None = None,
     title: str | None = None,
     source_index: int = 0,
     source_url: str = ICS_URL_A,
 ) -> CalendarEvent:
     start_dt = _datetime_on(day, *start)
-    end_dt = _datetime_on(day, *end)
+    end_dt = _datetime_on(end_day or day, *end)
     return CalendarEvent(
         uid=uid,
         title=title or uid,
