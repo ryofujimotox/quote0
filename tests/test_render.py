@@ -11,25 +11,29 @@ import pytest
 
 from handy_calendar.errors import HandyCalendarError
 from handy_calendar.steps.render import (
+    CANVAS_HEIGHT,
+    CANVAS_WIDTH,
+    DATE_FONT_PT,
     DATE_FONT_SIZE,
+    TIME_FONT_PT,
     TIME_FONT_SIZE,
+    TITLE_FONT_PT,
     TITLE_FONT_SIZE,
     DateHeaderLine,
     DayDividerLine,
     EventLine,
-    _bold_font_candidates,
+    EVENT_LINE_WIDTH,
     _build_lines,
     _fit_title_and_time,
-    _find_font_path,
     _format_date_header,
     _load_fonts,
-    _regular_font_candidates,
+    _px,
+    _resolve_font_paths,
     build_display_days,
     render_png,
 )
 
 from tests.factories import (
-    EVENT_LINE_WIDTH,
     REFERENCE_DAY_PLUS_3,
     REFERENCE_TODAY,
     REFERENCE_TOMORROW,
@@ -191,7 +195,7 @@ def test_fit_title_and_time_truncates_long_title_but_keeps_start_time(render_fon
 def test_fit_title_and_time_truncates_title_and_time_when_width_is_narrow(render_fonts) -> None:
     event = make_timed_event("garbage", title="燃えるゴミテスト", start=(10, 0), end=(10, 30))
 
-    assert _fit_title_and_time(event, render_fonts.emphasis.events, 150) == (
+    assert _fit_title_and_time(event, render_fonts.emphasis.events, 140) == (
         "燃…",
         "（10:00~",
     )
@@ -207,13 +211,12 @@ def test_fit_title_and_time_keeps_full_title_and_start_time_with_regular_font(re
 
 
 def test_load_fonts_uses_bold_for_emphasis_and_regular_for_second_block() -> None:
-    regular_path = next(path for path in _regular_font_candidates() if path.exists())
-    bold_path = next(path for path in _bold_font_candidates() if path.exists())
+    regular_path, bold_path = _resolve_font_paths()
     fonts = _load_fonts(regular_path, bold_path)
 
-    assert fonts.emphasis.date.size == DATE_FONT_SIZE == 20
-    assert fonts.emphasis.events.time.size == TIME_FONT_SIZE == 20
-    assert fonts.emphasis.events.title.size == TITLE_FONT_SIZE == 20
+    assert fonts.emphasis.date.size == DATE_FONT_SIZE == _px(DATE_FONT_PT)
+    assert fonts.emphasis.events.time.size == TIME_FONT_SIZE == _px(TIME_FONT_PT)
+    assert fonts.emphasis.events.title.size == TITLE_FONT_SIZE == _px(TITLE_FONT_PT)
     assert fonts.regular.events.time.size == TIME_FONT_SIZE
     assert fonts.regular.events.title.size == TITLE_FONT_SIZE
     assert fonts.emphasis.events.title != fonts.regular.events.title
@@ -237,10 +240,14 @@ def test_render_png_outputs_fixed_canvas_size() -> None:
     image = render_png(window)
 
     with Image.open(BytesIO(image.content)) as rendered:
-        assert rendered.size == (296, 152)
+        assert rendered.size == (CANVAS_WIDTH, CANVAS_HEIGHT)
         assert rendered.getbbox() is not None
 
 
-def test_find_font_path_raises_when_japanese_font_missing() -> None:
-    with pytest.raises(HandyCalendarError, match="japanese_font_missing"):
-        _find_font_path((Path("/tmp/handy-calendar-missing-font.ttf"),))
+def test_resolve_font_paths_raises_when_bundled_font_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    from handy_calendar.steps import render as render_module
+
+    monkeypatch.setattr(render_module, "REGULAR_FONT_PATH", Path("/tmp/handy-calendar-missing-font.ttf"))
+
+    with pytest.raises(HandyCalendarError, match="bundled_font_missing"):
+        _resolve_font_paths()

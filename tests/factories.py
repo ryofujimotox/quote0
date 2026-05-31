@@ -9,7 +9,7 @@ from email.message import Message
 from handy_calendar.config import AppConfig
 from handy_calendar.models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, FetchedIcal, JST, PngImage
 from handy_calendar.steps.ical import day_range
-from handy_calendar.steps.render import DisplayDay, DisplayEvent
+from handy_calendar.steps.render import DisplayDay, DisplayEvent, EVENT_LINE_WIDTH
 
 # テスト全体で基準日を揃える（2026-05-29 = 金曜）
 REFERENCE_TODAY = date(2026, 5, 29)
@@ -18,9 +18,6 @@ REFERENCE_DAY_PLUS_3 = date(2026, 6, 1)
 
 ICS_URL_A = "https://example.com/a.ics"
 ICS_URL_B = "https://example.com/b.ics"
-
-# render.py の予定行描画幅（WIDTH - 左右 MARGIN - EVENT_INDENT）
-EVENT_LINE_WIDTH = 296 - 12 - 6
 
 DOT_API_URL = "https://dot.mindreset.tech/api/authV2/open/device/device/image"
 VALID_PNG = PngImage(content=b"png", width=296, height=152)
