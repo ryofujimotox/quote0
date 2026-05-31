@@ -9,12 +9,15 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from icalendar import Calendar
+from recurring_ical_events import of as recurring_events_of
 
 from ..errors import HandyCalendarError
 from ..models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, FetchedIcal, JST
 
 
 FETCH_TIMEOUT_SECONDS = 20
+# RRULE 展開の走査上限（次の予定日探索と整合）
+RECURRENCE_EXPANSION_DAYS = 90
 
 
 def today_in_jst() -> date:
@@ -73,7 +76,9 @@ def parse_icals(calendars: tuple[FetchedIcal, ...], today: date) -> CalendarWind
     """
     print(f"iCal 解析: {len(calendars)}件", flush=True)
     today_period = day_range(today)
-    events = _sorted_events(event for calendar in calendars for event in _parse_calendar_events(calendar))
+    events = _sorted_events(
+        event for calendar in calendars for event in _parse_calendar_events(calendar, today)
+    )
     print(f"iCal 解析詳細: total_events={len(events)}", flush=True)
     for event in events:
         print(
@@ -126,18 +131,49 @@ def _decode_ics(content: bytes, headers: Message) -> str:
     return content.decode(charset)
 
 
-def _parse_calendar_events(calendar: FetchedIcal) -> tuple[CalendarEvent, ...]:
+def _parse_calendar_events(calendar: FetchedIcal, today: date) -> tuple[CalendarEvent, ...]:
     try:
         parsed = Calendar.from_ical(calendar.text)
     except ValueError as exc:
         raise HandyCalendarError(f"iCal 解析失敗 url={calendar.url} reason=invalid_ics") from exc
 
-    events: list[CalendarEvent] = []
-    for component in parsed.walk("VEVENT"):
-        if component.get("DTSTART") is None:
-            continue
-        events.append(_event_from_component(calendar, component))
-    return tuple(events)
+    window_start = datetime.combine(today, time.min, tzinfo=JST)
+    window_end = datetime.combine(
+        today + timedelta(days=RECURRENCE_EXPANSION_DAYS),
+        time.min,
+        tzinfo=JST,
+    )
+    try:
+        events: list[CalendarEvent] = []
+        seen: set[tuple[str, date | datetime]] = set()
+
+        def add_component(component) -> None:
+            if component.get("DTSTART") is None:
+                return
+            uid = str(component.get("UID") or "")
+            dtstart = component.decoded("DTSTART")
+            key = (uid, dtstart)
+            if key in seen:
+                return
+            seen.add(key)
+            events.append(_event_from_component(calendar, component))
+
+        # RRULE は90日窓で展開。単発 VEVENT は between の範囲外でも ICS から拾う
+        for component in recurring_events_of(parsed).between(window_start, window_end):
+            add_component(component)
+        for component in parsed.walk("VEVENT"):
+            if component.get("RRULE") is not None:
+                continue
+            # 繰り返しの例外は between 側のみ（90日窓外を単発扱いしない）
+            if component.get("RECURRENCE-ID") is not None:
+                continue
+            add_component(component)
+        return tuple(events)
+    except Exception as exc:
+        # 展開・VEVENT 変換失敗も url 付きで返し、main の想定外エラーに落とさない
+        raise HandyCalendarError(
+            f"iCal 解析失敗 url={calendar.url} reason=invalid_recurrence"
+        ) from exc
 
 
 def _event_from_component(calendar: FetchedIcal, component) -> CalendarEvent:

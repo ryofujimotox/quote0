@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from urllib.error import HTTPError
 
 import pytest
@@ -176,3 +177,92 @@ END:VCALENDAR
 
     assert window.next_day.day == REFERENCE_TOMORROW
     assert window.next_day.events == ()
+
+
+RECURRING_ICS = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:weekly
+SUMMARY:定例
+DTSTART;TZID=Asia/Tokyo:20260501T100000
+DTEND;TZID=Asia/Tokyo:20260501T110000
+RRULE:FREQ=WEEKLY;BYDAY=FR
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def test_parse_icals_expands_recurring_events_for_today() -> None:
+    window = parse_icals((make_fetched_ical(RECURRING_ICS),), REFERENCE_TODAY)
+
+    assert len(window.today.events) == 1
+    assert window.today.events[0].uid == "weekly"
+    assert window.today.events[0].title == "定例"
+
+
+INVALID_RECURRENCE_ICS = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:bad-rule
+SUMMARY:不正RRULE
+DTSTART;TZID=Asia/Tokyo:20260501T100000
+DTEND;TZID=Asia/Tokyo:20260501T110000
+RRULE:FREQ=INVALID
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def test_parse_icals_fails_on_invalid_recurrence_with_url() -> None:
+    with pytest.raises(
+        HandyCalendarError,
+        match=f"iCal 解析失敗 url={ICS_URL_A} reason=invalid_recurrence",
+    ):
+        parse_icals((make_fetched_ical(INVALID_RECURRENCE_ICS, url=ICS_URL_A),), REFERENCE_TODAY)
+
+
+FAR_ONE_OFF_ICS = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:far-future
+SUMMARY:90日超の予定
+DTSTART;TZID=Asia/Tokyo:20260901T100000
+DTEND;TZID=Asia/Tokyo:20260901T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def test_parse_icals_includes_one_off_events_beyond_recurrence_window() -> None:
+    window = parse_icals((make_fetched_ical(FAR_ONE_OFF_ICS),), REFERENCE_TODAY)
+
+    assert window.today.events == ()
+    assert window.next_day.day == date(2026, 9, 1)
+    assert tuple(event.uid for event in window.next_day.events) == ("far-future",)
+
+
+RECURRENCE_OVERRIDE_FAR_ICS = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:series
+SUMMARY:定例
+DTSTART;TZID=Asia/Tokyo:20260501T100000
+DTEND;TZID=Asia/Tokyo:20260501T110000
+RRULE:FREQ=WEEKLY;BYDAY=FR
+END:VEVENT
+BEGIN:VEVENT
+UID:series
+SUMMARY:90日超の例外
+RECURRENCE-ID;TZID=Asia/Tokyo:20260901T100000
+DTSTART;TZID=Asia/Tokyo:20260901T100000
+DTEND;TZID=Asia/Tokyo:20260901T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def test_parse_icals_skips_recurrence_id_outside_expansion_window() -> None:
+    window = parse_icals((make_fetched_ical(RECURRENCE_OVERRIDE_FAR_ICS),), REFERENCE_TODAY)
+
+    assert window.next_day.day == date(2026, 6, 5)
+    assert tuple(event.uid for event in window.next_day.events) == ("series",)
