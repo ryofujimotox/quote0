@@ -24,7 +24,7 @@ def _batch_start_now() -> datetime:
 
 
 def main() -> int:
-    """設定読込後、仮の処理段を順番に実行する。"""
+    """設定読込後、iCal 取得 → 解析 → PNG 生成 → Dot 送信を順に実行する。"""
     try:
         config = load_config()
         # 基準日・終了済み判定は取得前の同一時刻を使う（取得中の経過で判定がずれない）
@@ -49,7 +49,8 @@ def main() -> int:
         return 1
 
     print(
-        "起動確認OK: handy_calendar の仮処理が完了しました "
-        f"(ical_urls={len(config.ical_urls)}件, device_id={config.dot_device_id})"
+        "バッチ完了: iCal取得→解析→PNG→Dot送信 "
+        f"(ical_urls={len(config.ical_urls)}件, device_id={config.dot_device_id})",
+        flush=True,
     )
     return 0
