@@ -9,7 +9,11 @@ from PIL import Image
 
 import pytest
 
+from datetime import datetime
+
 from handy_calendar.errors import HandyCalendarError
+from handy_calendar.models import JST
+from handy_calendar.steps.ical import parse_icals
 from handy_calendar.steps.render import (
     CANVAS_HEIGHT,
     CANVAS_WIDTH,
@@ -38,6 +42,7 @@ from tests.factories import (
     REFERENCE_TODAY,
     REFERENCE_TOMORROW,
     all_day_display,
+    make_fetched_ical,
     display_day,
     empty_next_day_display_day,
     empty_today_display_day,
@@ -138,6 +143,44 @@ def test_build_display_days_shows_end_time_for_overnight_event() -> None:
     assert today_block.events[0].time_suffix == "（23:15~01:15）"
 
 
+def test_build_display_days_shows_carry_over_end_time_only_on_today() -> None:
+    carry_over = make_timed_event(
+        "carry-over",
+        title="前日開始の日跨ぎ",
+        day=REFERENCE_TODAY,
+        start=(23, 0),
+        end=(1, 0),
+        end_day=REFERENCE_TOMORROW,
+    )
+    window = make_window(base_day=REFERENCE_TOMORROW, today_events=(carry_over,))
+
+    today_block, _ = build_display_days(window)
+
+    assert today_block.events[0].time_suffix == "（~01:00）"
+
+
+def test_build_display_days_shows_carry_over_after_parse_icals() -> None:
+    carry_over_ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:carry-over
+SUMMARY:前日開始の日跨ぎ
+DTSTART;TZID=Asia/Tokyo:20260529T230000
+DTEND;TZID=Asia/Tokyo:20260530T010000
+END:VEVENT
+END:VCALENDAR
+"""
+    window = parse_icals(
+        (make_fetched_ical(carry_over_ics),),
+        REFERENCE_TOMORROW,
+        reference_now=datetime(2026, 5, 30, 0, 10, tzinfo=JST),
+    )
+
+    today_block, _ = build_display_days(window)
+
+    assert today_block.events[0].time_suffix == "（~01:00）"
+
+
 def test_build_lines_always_includes_second_day_block_even_when_today_is_full() -> None:
     events = tuple(
         make_timed_event(
@@ -171,7 +214,9 @@ def test_build_lines_interleaves_headers_events_and_divider() -> None:
 def test_fit_title_and_time_keeps_short_title_and_full_time(render_fonts) -> None:
     event = make_timed_event("short", title="短い", start=(10, 0), end=(10, 30))
 
-    assert _fit_title_and_time(event, render_fonts.emphasis.events, EVENT_LINE_WIDTH) == (
+    assert _fit_title_and_time(
+        event, render_fonts.emphasis.events, EVENT_LINE_WIDTH, time_suffix="（10:00~10:30）"
+    ) == (
         "短い",
         "（10:00~10:30）",
     )
@@ -185,7 +230,9 @@ def test_fit_title_and_time_truncates_long_title_but_keeps_start_time(render_fon
         end=(10, 30),
     )
 
-    title, suffix = _fit_title_and_time(event, render_fonts.emphasis.events, EVENT_LINE_WIDTH)
+    title, suffix = _fit_title_and_time(
+        event, render_fonts.emphasis.events, EVENT_LINE_WIDTH, time_suffix="（10:00~10:30）"
+    )
 
     assert title.endswith("…")
     assert suffix.startswith("（10:00")
@@ -195,7 +242,7 @@ def test_fit_title_and_time_truncates_long_title_but_keeps_start_time(render_fon
 def test_fit_title_and_time_truncates_title_and_time_when_width_is_narrow(render_fonts) -> None:
     event = make_timed_event("garbage", title="燃えるゴミテスト", start=(10, 0), end=(10, 30))
 
-    assert _fit_title_and_time(event, render_fonts.emphasis.events, 140) == (
+    assert _fit_title_and_time(event, render_fonts.emphasis.events, 140, time_suffix="（10:00~10:30）") == (
         "燃…",
         "（10:00~",
     )
@@ -204,7 +251,9 @@ def test_fit_title_and_time_truncates_title_and_time_when_width_is_narrow(render
 def test_fit_title_and_time_keeps_full_title_and_start_time_with_regular_font(render_fonts) -> None:
     event = make_timed_event("garbage-full", title="燃えるゴミテスト", start=(10, 0), end=(10, 30))
 
-    assert _fit_title_and_time(event, render_fonts.regular.events, EVENT_LINE_WIDTH) == (
+    assert _fit_title_and_time(
+        event, render_fonts.regular.events, EVENT_LINE_WIDTH, time_suffix="（10:00~10:30）"
+    ) == (
         "燃えるゴミテスト",
         "（10:00~",
     )

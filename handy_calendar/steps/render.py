@@ -8,6 +8,7 @@
     …
 
 予定行の省略優先度: 開始時刻 → 予定名 → 終了時刻
+前日開始の持ち越しは `（~終了）` のみ（開始時刻は出さない）
 2 枠目も描画行に含め、上から順に描く。下端はみ出して見切れてもよい。
 """
 
@@ -21,7 +22,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from ..errors import HandyCalendarError
-from ..models import CalendarEvent, CalendarWindow, DaySchedule, PngImage
+from ..models import CalendarEvent, CalendarWindow, DaySchedule, JST, PngImage
 
 
 @dataclass(frozen=True)
@@ -155,13 +156,15 @@ def _display_day_from_schedule(schedule: DaySchedule, reference_today: date) -> 
     return DisplayDay(
         day=schedule.day,
         header=_format_date_header(schedule.day, reference_today),
-        events=tuple(_display_event_from_calendar(event) for event in schedule.events),
+        events=tuple(_display_event_from_calendar(event, schedule.day) for event in schedule.events),
     )
 
 
-def _display_event_from_calendar(event: CalendarEvent) -> DisplayEvent:
+def _display_event_from_calendar(event: CalendarEvent, display_day: date) -> DisplayEvent:
     if event.all_day:
         return DisplayEvent(event=event, time_suffix=None)
+    if _is_carry_over_on_day(event, display_day):
+        return DisplayEvent(event=event, time_suffix=_carry_over_time_suffix(event))
     start_text, end_text = _event_time_parts(event)
     return DisplayEvent(
         event=event,
@@ -238,6 +241,21 @@ def _format_date_header(day: date, reference_today: date) -> str:
 # --- 予定行: 「予定名」+「（時刻）」を横並び ---
 
 
+def _event_start_day(event: CalendarEvent) -> date:
+    return event.period.start.astimezone(JST).date()
+
+
+def _is_carry_over_on_day(event: CalendarEvent, display_day: date) -> bool:
+    """表示日より前に開始した timed 予定（今日枠の持ち越し）。"""
+    return not event.all_day and _event_start_day(event) < display_day
+
+
+def _carry_over_time_suffix(event: CalendarEvent) -> str:
+    """持ち越し行は終了時刻だけ `（~HH:MM）`。"""
+    end_text = event.period.end.astimezone(JST).strftime("%H:%M")
+    return f"（~{end_text}）"
+
+
 def _event_time_parts(event: CalendarEvent) -> tuple[str, str | None]:
     """表示用の開始・終了時刻文字列。区間が無いとき end は None。"""
     start_text = event.period.start.strftime("%H:%M")
@@ -279,7 +297,7 @@ def _draw_event_line(
         if title:
             draw.text((event_left, y), title, fill=INK, font=fonts.title)
         return
-    title, time_suffix = _fit_title_and_time(event, fonts, event_width)
+    title, time_suffix = _fit_title_and_time(event, fonts, event_width, time_suffix=display_event.time_suffix)
     draw.text((event_left, y), title, fill=INK, font=fonts.title)
     if time_suffix:
         draw.text((event_left + _text_width(title, fonts.title), y), time_suffix, fill=INK, font=fonts.time)
@@ -289,14 +307,22 @@ def _fit_title_and_time(
     event: CalendarEvent,
     fonts: EventFonts,
     event_width: int,
+    *,
+    time_suffix: str | None,
 ) -> tuple[str, str]:
     """1行に収める予定名と時刻 suffix を決める。
 
+    time_suffix は build_display_days と同じルールで渡す（持ち越しは `（~HH:MM）`）。
     優先度: 開始時刻 → 予定名 → 終了時刻。
     例: 幅が足りない → `長い予定…（10:00~`（閉じ括弧なし）
     """
+    if time_suffix is None:
+        return event.title, ""
+    if time_suffix.startswith("（~"):
+        return _fit_title_and_carry_over_time(event, fonts, event_width, time_suffix)
+
     start_text, end_text = _event_time_parts(event)
-    full_suffix = _time_suffix_text(start_text, end_text, with_end=True)
+    full_suffix = time_suffix
     if _text_width(event.title, fonts.title) + _text_width(full_suffix, fonts.time) <= event_width:
         return event.title, full_suffix
 
@@ -307,6 +333,47 @@ def _fit_title_and_time(
     remaining = max(0, event_width - _text_width(title, fonts.title))
     suffix = _build_time_suffix(start_text, end_text, fonts.time, remaining)
     return title, suffix
+
+
+def _fit_title_and_carry_over_time(
+    event: CalendarEvent,
+    fonts: EventFonts,
+    event_width: int,
+    full_suffix: str,
+) -> tuple[str, str]:
+    """持ち越し行: 予定名 + `（~終了）` を幅に収める。"""
+    if _text_width(event.title, fonts.title) + _text_width(full_suffix, fonts.time) <= event_width:
+        return event.title, full_suffix
+
+    min_suffix = "（~"
+    allowed_title_width = max(0, event_width - _text_width(min_suffix, fonts.time))
+    title = _truncate_to_width(event.title, fonts.title, allowed_title_width)
+    remaining = max(0, event_width - _text_width(title, fonts.title))
+    suffix = _build_carry_over_time_suffix(full_suffix, fonts.time, remaining)
+    return title, suffix
+
+
+def _build_carry_over_time_suffix(full_suffix: str, font: ImageFont.ImageFont, max_width: int) -> str:
+    """持ち越しの `（~HH:MM）` を残り幅に収める。"""
+    if max_width <= 0 or not full_suffix.startswith("（~") or not full_suffix.endswith("）"):
+        return ""
+    if _text_width(full_suffix, font) <= max_width:
+        return full_suffix
+
+    end_text = full_suffix[2:-1]
+    base = "（~"
+    closing_width = _text_width("）", font)
+    end_room = max_width - _text_width(base, font) - closing_width
+    if end_room > 0:
+        end_part = _truncate_to_width(end_text, font, end_room)
+        if end_part and end_part != "…":
+            with_end = f"{base}{end_part}）"
+            if _text_width(with_end, font) <= max_width:
+                return with_end
+
+    if _text_width(base, font) <= max_width:
+        return base
+    return _truncate_to_width(base, font, max_width)
 
 
 def _build_time_suffix(
