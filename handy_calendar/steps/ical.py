@@ -98,16 +98,17 @@ def parse_icals(
         )
     next_day = _find_next_event_day(events, today)
     next_day_period = day_range(next_day)
+    # 今日枠は overlap（前日開始の進行中も載せる）。2枠目は開始日のみ（日跨ぎの二重表示を避ける）
     return CalendarWindow(
         today=DaySchedule(
             day=today,
             period=today_period,
-            events=_events_still_active(_events_for_day(events, today_period), now),
+            events=_events_still_active(_events_overlapping_day(events, today_period), now),
         ),
         next_day=DaySchedule(
             day=next_day,
             period=next_day_period,
-            events=_events_still_active(_events_for_day(events, next_day_period), now),
+            events=_events_still_active(_events_starting_on_day(events, next_day_period), now),
         ),
     )
 
@@ -121,19 +122,8 @@ def _find_next_event_day(events: tuple[CalendarEvent, ...], today: date) -> date
 
 
 def _days_with_events_after(events: tuple[CalendarEvent, ...], today: date) -> tuple[date, ...]:
-    """today より後に overlap する予定があるカレンダー日を昇順で返す。"""
-    days: set[date] = set()
-    for event in events:
-        current = event.period.start.astimezone(JST).date()
-        end = event.period.end.astimezone(JST)
-        if end.time() == time.min and end.date() > current:
-            last = end.date() - timedelta(days=1)
-        else:
-            last = end.date()
-        while current <= last:
-            if current > today:
-                days.add(current)
-            current += timedelta(days=1)
+    """today より後に開始する予定があるカレンダー日を昇順で返す。"""
+    days = {_event_start_day(event) for event in events if _event_start_day(event) > today}
     return tuple(sorted(days))
 
 
@@ -227,8 +217,18 @@ def _sorted_events(events: Iterable[CalendarEvent]) -> tuple[CalendarEvent, ...]
     return tuple(sorted(events, key=lambda event: (event.source_index, event.period.start, event.uid)))
 
 
-def _events_for_day(events: tuple[CalendarEvent, ...], period: DateRange) -> tuple[CalendarEvent, ...]:
+def _events_overlapping_day(events: tuple[CalendarEvent, ...], period: DateRange) -> tuple[CalendarEvent, ...]:
     return tuple(event for event in events if period.overlaps(event.period))
+
+
+def _events_starting_on_day(events: tuple[CalendarEvent, ...], period: DateRange) -> tuple[CalendarEvent, ...]:
+    target_day = period.start.astimezone(JST).date()
+    return tuple(event for event in events if _event_start_day(event) == target_day)
+
+
+def _event_start_day(event: CalendarEvent) -> date:
+    """2枠目の載せ先・次の予定日探索は、JST の開始日だけで決める。"""
+    return event.period.start.astimezone(JST).date()
 
 
 def _events_still_active(events: tuple[CalendarEvent, ...], now: datetime) -> tuple[CalendarEvent, ...]:
