@@ -133,7 +133,7 @@ def test_parse_icals_returns_today_and_next_day_frames() -> None:
     assert parse_icals((), REFERENCE_TODAY, reference_now=REFERENCE_NOW) == make_empty_window()
 
 
-def test_parse_icals_extracts_overlapping_events_and_sorts_deterministically() -> None:
+def test_parse_icals_extracts_events_by_frame_rule_and_sorts_deterministically() -> None:
     window = parse_icals(
         (
             make_fetched_ical(MULTI_SOURCE_ICS_A, source_index=0, url=ICS_URL_A),
@@ -147,8 +147,31 @@ def test_parse_icals_extracts_overlapping_events_and_sorts_deterministically() -
     assert_window_event_uids(
         window,
         today=("same-a", "same-b", "night", "early"),
-        next_day=("night", "tomorrow"),
+        next_day=("tomorrow",),
     )
+
+
+def test_parse_icals_keeps_active_carry_over_event_on_today() -> None:
+    carry_over_ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:carry-over
+SUMMARY:前日開始の日跨ぎ
+DTSTART;TZID=Asia/Tokyo:20260529T230000
+DTEND;TZID=Asia/Tokyo:20260530T010000
+END:VEVENT
+END:VCALENDAR
+"""
+    just_after_midnight = datetime(2026, 5, 30, 0, 10, tzinfo=JST)
+
+    window = parse_icals(
+        (make_fetched_ical(carry_over_ics),),
+        REFERENCE_TOMORROW,
+        reference_now=just_after_midnight,
+    )
+
+    assert tuple(event.uid for event in window.today.events) == ("carry-over",)
+    assert window.next_day.events == ()
 
 
 def test_parse_icals_normalizes_all_day_events_to_jst_day_range() -> None:
