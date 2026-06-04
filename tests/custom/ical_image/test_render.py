@@ -11,10 +11,10 @@ import pytest
 
 from datetime import datetime
 
-from quote0.errors import HandyCalendarError
-from quote0.models import JST
-from quote0.steps.ical import parse_icals
-from quote0.steps.render import (
+from quote0_client.exceptions import Quote0Error
+from quote0.custom.ical_image.ical_models import JST
+from quote0.custom.ical_image.ical import parse_icals
+from quote0.custom.ical_image.render import (
     CANVAS_HEIGHT,
     CANVAS_WIDTH,
     DATE_FONT_PT,
@@ -37,7 +37,7 @@ from quote0.steps.render import (
     render_png,
 )
 
-from tests.factories import (
+from tests.custom.ical_image.factories import (
     REFERENCE_DAY_PLUS_3,
     REFERENCE_TODAY,
     REFERENCE_TOMORROW,
@@ -63,19 +63,19 @@ def test_format_date_header_uses_reference_today_and_weekday() -> None:
 
 def test_build_display_days_converts_timed_events() -> None:
     window = make_window_with_timed_events()
-    today_event = window.today.events[0]
-    next_day_event = window.next_day.events[0]
+    start_event = window.first_day.events[0]
+    next_event = window.next_day.events[0]
 
     assert build_display_days(window) == (
         display_day(
-            day=REFERENCE_TODAY,
+            date=REFERENCE_TODAY,
             header="今日（5/29金）",
-            events=(timed_display(today_event, "（10:00~10:30）"),),
+            events=(timed_display(start_event, "（10:00~10:30）"),),
         ),
         display_day(
-            day=REFERENCE_TOMORROW,
+            date=REFERENCE_TOMORROW,
             header="明日（5/30土）",
-            events=(timed_display(next_day_event, "（15:00~16:00）"),),
+            events=(timed_display(next_event, "（15:00~16:00）"),),
         ),
     )
 
@@ -87,7 +87,7 @@ def test_build_display_days_omits_time_suffix_for_all_day_event() -> None:
     assert build_display_days(window) == (
         empty_today_display_day(),
         display_day(
-            day=REFERENCE_TOMORROW,
+            date=REFERENCE_TOMORROW,
             header="明日（5/30土）",
             events=(all_day_display(all_day),),
         ),
@@ -103,7 +103,7 @@ def test_build_display_days_leaves_empty_days_without_events() -> None:
 
 def test_build_display_days_uses_days_after_label_for_skipped_days() -> None:
     event = make_timed_event("later", day=REFERENCE_DAY_PLUS_3, start=(10, 0), end=(11, 0))
-    window = make_window(next_day=REFERENCE_DAY_PLUS_3, next_day_events=(event,))
+    window = make_window(next_date=REFERENCE_DAY_PLUS_3, next_day_events=(event,))
 
     _, next_block = build_display_days(window)
 
@@ -113,12 +113,12 @@ def test_build_display_days_uses_days_after_label_for_skipped_days() -> None:
 def test_build_display_days_keeps_event_order() -> None:
     first = make_timed_event("first", start=(9, 0), end=(9, 30))
     second = make_timed_event("second", start=(10, 0), end=(10, 30))
-    window = make_window(today_events=(first, second))
+    window = make_window(first_day_events=(first, second))
 
     today_block, next_day_block = build_display_days(window)
 
     assert today_block == display_day(
-        day=REFERENCE_TODAY,
+        date=REFERENCE_TODAY,
         header="今日（5/29金）",
         events=(
             timed_display(first, "（09:00~09:30）"),
@@ -136,7 +136,7 @@ def test_build_display_days_shows_end_time_for_overnight_event() -> None:
         end=(1, 15),
         end_day=REFERENCE_TOMORROW,
     )
-    window = make_window(today_events=(overnight,))
+    window = make_window(first_day_events=(overnight,))
 
     today_block, _ = build_display_days(window)
 
@@ -152,7 +152,7 @@ def test_build_display_days_shows_carry_over_end_time_only_on_today() -> None:
         end=(1, 0),
         end_day=REFERENCE_TOMORROW,
     )
-    window = make_window(base_day=REFERENCE_TOMORROW, today_events=(carry_over,))
+    window = make_window(first_date=REFERENCE_TOMORROW, first_day_events=(carry_over,))
 
     today_block, _ = build_display_days(window)
 
@@ -172,7 +172,6 @@ END:VCALENDAR
 """
     window = parse_icals(
         (make_fetched_ical(carry_over_ics),),
-        REFERENCE_TOMORROW,
         reference_now=datetime(2026, 5, 30, 0, 10, tzinfo=JST),
     )
 
@@ -190,7 +189,7 @@ def test_build_lines_always_includes_second_day_block_even_when_today_is_full() 
         )
         for index in range(24)
     )
-    window = make_window(today_events=events)
+    window = make_window(first_day_events=events)
     lines = _build_lines(build_display_days(window))
 
     divider_idx = next(i for i, line in enumerate(lines) if isinstance(line, DayDividerLine))
@@ -283,7 +282,7 @@ def test_render_png_is_deterministic() -> None:
 
 def test_render_png_outputs_fixed_canvas_size() -> None:
     window = make_window(
-        today_events=(make_timed_event("event-1", title="打合せ", start=(10, 0), end=(11, 0)),),
+        first_day_events=(make_timed_event("event-1", title="打合せ", start=(10, 0), end=(11, 0)),),
     )
 
     image = render_png(window)
@@ -294,9 +293,9 @@ def test_render_png_outputs_fixed_canvas_size() -> None:
 
 
 def test_resolve_font_paths_raises_when_bundled_font_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    from quote0.steps import render as render_module
+    from quote0.custom.ical_image import render as render_module
 
     monkeypatch.setattr(render_module, "REGULAR_FONT_PATH", Path("/tmp/quote0-missing-font.ttf"))
 
-    with pytest.raises(HandyCalendarError, match="bundled_font_missing"):
+    with pytest.raises(Quote0Error, match="bundled_font_missing"):
         _resolve_font_paths()

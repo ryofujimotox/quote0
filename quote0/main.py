@@ -5,12 +5,21 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
+import httpx
+from quote0_client import Quote0Client
+from quote0_client.exceptions import (
+    AuthenticationError,
+    NotFoundError,
+    PermissionError,
+    Quote0Error,
+    RateLimitError,
+    ValidationError,
+)
+from quote0_client.models import ImageContentRequest
+
 from .config import load_config
-from .errors import HandyCalendarError
-from .models import JST
-from .steps.dot import send_dot_image
-from .steps.ical import fetch_icals, parse_icals
-from .steps.render import render_png
+from .custom.ical_image import CustomIcalImageContentRequest
+from .custom.ical_image.ical_models import JST
 
 
 def log_error(message: str) -> None:
@@ -23,25 +32,59 @@ def _batch_start_now() -> datetime:
     return datetime.now(JST)
 
 
-def main() -> int:
-    """設定読込後、iCal 取得 → 解析 → PNG 生成 → Dot 送信を順に実行する。"""
+def _send_dot_image(
+    client: Quote0Client,
+    device_id: str,
+    content: ImageContentRequest,
+) -> None:
+    """Dot 画像送信。失敗時は日本語の Quote0Error に揃える。"""
     try:
+        response = client.send_image(device_id, content)
+    except httpx.RequestError as exc:
+        raise Quote0Error(f"Dot 送信失敗 reason={exc}") from exc
+    except AuthenticationError as exc:
+        raise Quote0Error("Dot 送信失敗: API キーが無効です") from exc
+    except NotFoundError as exc:
+        raise Quote0Error(f"Dot 送信失敗: デバイスが見つかりません device_id={device_id}") from exc
+    except PermissionError as exc:
+        raise Quote0Error("Dot 送信失敗: 権限がありません") from exc
+    except ValidationError as exc:
+        raise Quote0Error("Dot 送信失敗: リクエストが不正です") from exc
+    except RateLimitError as exc:
+        raise Quote0Error("Dot 送信失敗: レート制限を超えました") from exc
+    except Quote0Error as exc:
+        raise Quote0Error(f"Dot 送信失敗: {exc}") from exc
+    if not response.success:
+        raise Quote0Error(f"Dot 送信失敗 code={response.code}")
+
+
+def main() -> int:
+    """設定読込後、iCal 画像リクエストを組み立てて Dot へ送信する。"""
+    try:
+        # 設定を読み込む
         config = load_config()
-        # 基準日・終了済み判定は取得前の同一時刻を使う（取得中の経過で判定がずれない）
-        started_at = _batch_start_now()
-        today = started_at.date()
-        calendars = fetch_icals(config.ical_urls)
-        print(f"iCal 取得完了: {len(calendars)}件", flush=True)
-        calendar = parse_icals(calendars, today, reference_now=started_at)
+        ical_urls = config.ical_urls
+        dot_api_token = config.dot_api_token
+        dot_device_id = config.dot_device_id
+        
+        # iCal 画像リクエストを組み立てる
+        reference_now = _batch_start_now()
+        content = CustomIcalImageContentRequest(
+            ical_urls=ical_urls,
+            reference_now=reference_now,
+        ).to_image_content_request()
         print(
-            "iCal 解析完了: "
-            f"today={len(calendar.today.events)}件, "
-            f"next_day={calendar.next_day.day.isoformat()}({len(calendar.next_day.events)}件)",
+            f"Dot 送信: device_id={dot_device_id}, bytes={len(content.image)}",
             flush=True,
         )
-        image = render_png(calendar)
-        send_dot_image(config, image)
-    except HandyCalendarError as exc:
+        
+        # Dot API を使用して画像を送信
+        client = Quote0Client(api_key=dot_api_token)
+        try:
+            _send_dot_image(client, dot_device_id, content)
+        finally:
+            client.close()
+    except Quote0Error as exc:
         log_error(f"起動失敗: {exc}")
         return 1
     except Exception as exc:
@@ -50,7 +93,7 @@ def main() -> int:
 
     print(
         "バッチ完了: iCal取得→解析→PNG→Dot送信 "
-        f"(ical_urls={len(config.ical_urls)}件, device_id={config.dot_device_id})",
+        f"(ical_urls={len(config.ical_urls)}件, device_id={dot_device_id})",
         flush=True,
     )
     return 0

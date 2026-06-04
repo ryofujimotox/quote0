@@ -34,7 +34,7 @@ flowchart LR
 ## 技術スタック
 
 - Python 3.12（[.python-version](./.python-version)）
-- pytest・Pillow・icalendar・recurring_ical_events・python-dotenv
+- pytest・Pillow・icalendar・recurring_ical_events・python-dotenv・httpx・pydantic
 - 運用は Linux 上の cron（[docs/deploy.md](./docs/deploy.md)）
 
 
@@ -69,4 +69,5 @@ python3.12 -m venv .venv
 | [docs/deploy.md](./docs/deploy.md) | セットアップ・更新・単体テスト実行手順 |
 | [docs/git.md](./docs/git.md) | Git 運用・コミットメッセージ |
 | [.env.example](./.env.example) | 環境変数名テンプレ |
-| [LICENSE](./LICENSE) | 本体（MIT）。フォントは [quote0/fonts/LICENSE](./quote0/fonts/LICENSE)（OFL） |
+| [LICENSE](./LICENSE) | 本体（MIT）。フォントは [quote0/custom/ical_image/fonts/LICENSE](./quote0/custom/ical_image/fonts/LICENSE)（OFL） |
+| [vendor/quote0_client/LICENSE](./vendor/quote0_client/LICENSE) | Dot 送信用 SDK（MIT / YetYeti） |
