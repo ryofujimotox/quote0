@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from handy_calendar.models import JST, DateRange
+from quote0.models import JST, DateRange
 
 
 def test_date_range_rejects_naive_datetime() -> None:

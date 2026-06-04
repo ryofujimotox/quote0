@@ -6,10 +6,10 @@ import json
 from datetime import date, datetime, timedelta
 from email.message import Message
 
-from handy_calendar.config import AppConfig
-from handy_calendar.models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, FetchedIcal, JST, PngImage
-from handy_calendar.steps.ical import day_range
-from handy_calendar.steps.render import DisplayDay, DisplayEvent, EVENT_LINE_WIDTH
+from quote0.config import AppConfig
+from quote0.models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, FetchedIcal, JST, PngImage
+from quote0.steps.ical import day_range
+from quote0.steps.render import DisplayDay, DisplayEvent, EVENT_LINE_WIDTH
 
 # テスト全体で基準日を揃える（2026-05-29 = 金曜）
 REFERENCE_TODAY = date(2026, 5, 29)

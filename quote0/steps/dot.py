@@ -27,7 +27,7 @@ def send_dot_image(config: AppConfig, image: PngImage) -> DotSendResult:
         headers={
             "Authorization": f"Bearer {config.dot_api_token}",
             "Content-Type": "application/json",
-            "User-Agent": "handy-calendar/0",
+            "User-Agent": "quote0/0",
         },
         method="POST",
     )

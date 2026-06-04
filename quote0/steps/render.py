@@ -85,7 +85,7 @@ INK = (30, 34, 40)
 ACCENT = (39, 98, 166)
 DIVIDER = (90, 96, 108)
 
-# 環境差を避けるため、パッケージ同梱の Noto Sans JP のみ使う（handy_calendar/fonts/）
+# 環境差を避けるため、パッケージ同梱の Noto Sans JP のみ使う（quote0/fonts/）
 _FONTS_DIR = Path(__file__).resolve().parent.parent / "fonts"
 REGULAR_FONT_PATH = _FONTS_DIR / "NotoSansJP-Regular.otf"
 BOLD_FONT_PATH = _FONTS_DIR / "NotoSansJP-Bold.otf"

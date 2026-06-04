@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from handy_calendar.config import ConfigError, load_config
+from quote0.config import ConfigError, load_config
 
 
 REQUIRED_ENV_NAMES = ("ICAL_URLS", "DOT_API_TOKEN", "DOT_DEVICE_ID")

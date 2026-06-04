@@ -44,7 +44,7 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
     print(f"iCal 取得: {len(urls)}件", flush=True)
     fetched: list[FetchedIcal] = []
     for index, url in enumerate(urls):
-        request = Request(url, headers={"User-Agent": "handy-calendar/0"})
+        request = Request(url, headers={"User-Agent": "quote0/0"})
         try:
             with urlopen(request, timeout=FETCH_TIMEOUT_SECONDS) as response:
                 status = getattr(response, "status", 200)

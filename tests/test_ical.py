@@ -7,10 +7,10 @@ from urllib.error import HTTPError
 
 import pytest
 
-from handy_calendar.errors import HandyCalendarError
-from handy_calendar.models import JST
-from handy_calendar.steps import ical as ical_module
-from handy_calendar.steps.ical import fetch_icals, parse_icals
+from quote0.errors import HandyCalendarError
+from quote0.models import JST
+from quote0.steps import ical as ical_module
+from quote0.steps.ical import fetch_icals, parse_icals
 
 from tests.factories import (
     FakeResponse,

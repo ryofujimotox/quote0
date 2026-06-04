@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from handy_calendar.errors import HandyCalendarError
-from handy_calendar import main as main_module
-from handy_calendar.models import CalendarWindow, DotSendResult, FetchedIcal, JST, PngImage
+from quote0.errors import HandyCalendarError
+from quote0 import main as main_module
+from quote0.models import CalendarWindow, DotSendResult, FetchedIcal, JST, PngImage
 
 from tests.factories import ICS_URL_A, make_dot_config, make_empty_window
 
