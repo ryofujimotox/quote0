@@ -11,10 +11,10 @@ import pytest
 
 from datetime import datetime
 
-from handy_calendar.errors import HandyCalendarError
-from handy_calendar.models import JST
-from handy_calendar.steps.ical import parse_icals
-from handy_calendar.steps.render import (
+from quote0.errors import HandyCalendarError
+from quote0.models import JST
+from quote0.steps.ical import parse_icals
+from quote0.steps.render import (
     CANVAS_HEIGHT,
     CANVAS_WIDTH,
     DATE_FONT_PT,
@@ -294,9 +294,9 @@ def test_render_png_outputs_fixed_canvas_size() -> None:
 
 
 def test_resolve_font_paths_raises_when_bundled_font_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    from handy_calendar.steps import render as render_module
+    from quote0.steps import render as render_module
 
-    monkeypatch.setattr(render_module, "REGULAR_FONT_PATH", Path("/tmp/handy-calendar-missing-font.ttf"))
+    monkeypatch.setattr(render_module, "REGULAR_FONT_PATH", Path("/tmp/quote0-missing-font.ttf"))
 
     with pytest.raises(HandyCalendarError, match="bundled_font_missing"):
         _resolve_font_paths()

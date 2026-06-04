@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from handy_calendar.steps.render import _load_fonts, _resolve_font_paths
+from quote0.steps.render import _load_fonts, _resolve_font_paths
 
 
 @pytest.fixture(scope="module")

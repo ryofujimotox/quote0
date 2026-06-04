@@ -6,10 +6,10 @@ import json
 
 import pytest
 
-from handy_calendar.errors import HandyCalendarError
-from handy_calendar.models import DotSendResult, PngImage
-from handy_calendar.steps import dot as dot_module
-from handy_calendar.steps.dot import send_dot_image
+from quote0.errors import HandyCalendarError
+from quote0.models import DotSendResult, PngImage
+from quote0.steps import dot as dot_module
+from quote0.steps.dot import send_dot_image
 
 from tests.factories import DOT_API_URL, FakeJsonResponse, VALID_PNG, make_dot_config
 

@@ -20,7 +20,7 @@ flowchart LR
   cron["cron"] --> batch
   batch --> device["デバイス表示"]
 
-  subgraph batch["handy-calendar"]
+  subgraph batch["quote0"]
     direction LR
     python["Python"] --> ical["公開 iCal URL"]
     env[".env"] --> ical
@@ -69,4 +69,4 @@ python3.12 -m venv .venv
 | [docs/deploy.md](./docs/deploy.md) | セットアップ・更新・単体テスト実行手順 |
 | [docs/git.md](./docs/git.md) | Git 運用・コミットメッセージ |
 | [.env.example](./.env.example) | 環境変数名テンプレ |
-| [LICENSE](./LICENSE) | 本体（MIT）。フォントは [handy_calendar/fonts/LICENSE](./handy_calendar/fonts/LICENSE)（OFL） |
+| [LICENSE](./LICENSE) | 本体（MIT）。フォントは [quote0/fonts/LICENSE](./quote0/fonts/LICENSE)（OFL） |
