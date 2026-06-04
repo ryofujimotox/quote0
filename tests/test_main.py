@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from quote0.errors import HandyCalendarError
+from quote0_client.exceptions import Quote0Error
+
 from quote0 import main as main_module
 from quote0.models import CalendarWindow, DotSendResult, FetchedIcal, JST, PngImage
 
@@ -100,7 +101,7 @@ def test_main_returns_non_zero_and_stops_when_step_fails(monkeypatch, capsys) ->
 
     def fetch_icals(_: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
         called.append("fetch")
-        raise HandyCalendarError(f"iCal 取得失敗 url={ICS_URL_A}")
+        raise Quote0Error(f"iCal 取得失敗 url={ICS_URL_A}")
 
     monkeypatch.setattr(main_module, "fetch_icals", fetch_icals)
     monkeypatch.setattr(main_module, "parse_icals", lambda *_: called.append("parse"))
@@ -127,7 +128,7 @@ def test_main_returns_non_zero_when_dot_send_fails(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         main_module,
         "send_dot_image",
-        lambda *_: (_ for _ in ()).throw(HandyCalendarError("Dot 送信失敗 code=400")),
+        lambda *_: (_ for _ in ()).throw(Quote0Error("Dot 送信失敗 code=400")),
     )
 
     assert main_module.main() == 1

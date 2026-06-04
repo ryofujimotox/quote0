@@ -5,8 +5,9 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
+from quote0_client.exceptions import Quote0Error
+
 from .config import load_config
-from .errors import HandyCalendarError
 from .models import JST
 from .steps.dot import send_dot_image
 from .steps.ical import fetch_icals, parse_icals
@@ -41,7 +42,7 @@ def main() -> int:
         )
         image = render_png(calendar)
         send_dot_image(config, image)
-    except HandyCalendarError as exc:
+    except Quote0Error as exc:
         log_error(f"起動失敗: {exc}")
         return 1
     except Exception as exc:

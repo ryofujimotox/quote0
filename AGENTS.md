@@ -156,8 +156,8 @@
 | `models.py` | `DateRange`（半開区間の例）、`overlaps`、予定・日枠の型 |
 | `steps/ical.py` | iCal 取得・解析、JST の日枠 |
 | `steps/render.py` | PNG 生成 |
-| `steps/dot.py` | Dot 送信 |
-| `errors.py` | 利用者へ説明できるアプリ内エラー |
+| `steps/dot.py` | Dot 送信（`vendor/quote0_client` の SDK 経由） |
+| `content/ical_image.py` | iCal → PNG → `ImageContentRequest` の拡張 |
 
 
 ### コメントの書き方

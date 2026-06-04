@@ -21,7 +21,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from ..errors import HandyCalendarError
+from quote0_client.exceptions import Quote0Error
 from ..models import CalendarEvent, CalendarWindow, DaySchedule, JST, PngImage
 
 
@@ -445,7 +445,7 @@ def _resolve_font_paths() -> tuple[Path, Path]:
     """同梱フォントの存在を確認し、Regular / Bold のパスを返す。"""
     missing = [path for path in (REGULAR_FONT_PATH, BOLD_FONT_PATH) if not path.exists()]
     if missing:
-        raise HandyCalendarError(
+        raise Quote0Error(
             "PNG 生成失敗 reason=bundled_font_missing "
             + " ".join(f"path={path}" for path in missing)
         )

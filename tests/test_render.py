@@ -11,7 +11,7 @@ import pytest
 
 from datetime import datetime
 
-from quote0.errors import HandyCalendarError
+from quote0_client.exceptions import Quote0Error
 from quote0.models import JST
 from quote0.steps.ical import parse_icals
 from quote0.steps.render import (
@@ -298,5 +298,5 @@ def test_resolve_font_paths_raises_when_bundled_font_missing(monkeypatch: pytest
 
     monkeypatch.setattr(render_module, "REGULAR_FONT_PATH", Path("/tmp/quote0-missing-font.ttf"))
 
-    with pytest.raises(HandyCalendarError, match="bundled_font_missing"):
+    with pytest.raises(Quote0Error, match="bundled_font_missing"):
         _resolve_font_paths()

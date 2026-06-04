@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 from icalendar import Calendar
 from recurring_ical_events import of as recurring_events_of
 
-from ..errors import HandyCalendarError
+from quote0_client.exceptions import Quote0Error
 from ..models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, FetchedIcal, JST
 
 
@@ -49,17 +49,17 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
             with urlopen(request, timeout=FETCH_TIMEOUT_SECONDS) as response:
                 status = getattr(response, "status", 200)
                 if status < 200 or status >= 300:
-                    raise HandyCalendarError(f"iCal 取得失敗 url={url} status={status}")
+                    raise Quote0Error(f"iCal 取得失敗 url={url} status={status}")
                 content = response.read()
                 text = _decode_ics(content, response.headers)
                 print(f"iCal 取得詳細: source={index}, bytes={len(content)}", flush=True)
                 fetched.append(FetchedIcal(source_index=index, url=url, text=text))
         except HTTPError as exc:
-            raise HandyCalendarError(f"iCal 取得失敗 url={url} status={exc.code}") from exc
+            raise Quote0Error(f"iCal 取得失敗 url={url} status={exc.code}") from exc
         except URLError as exc:
-            raise HandyCalendarError(f"iCal 取得失敗 url={url} reason={exc.reason}") from exc
+            raise Quote0Error(f"iCal 取得失敗 url={url} reason={exc.reason}") from exc
         except TimeoutError as exc:
-            raise HandyCalendarError(f"iCal 取得失敗 url={url} reason=timeout") from exc
+            raise Quote0Error(f"iCal 取得失敗 url={url} reason=timeout") from exc
     return tuple(fetched)
 
 
@@ -137,7 +137,7 @@ def _parse_calendar_events(calendar: FetchedIcal, today: date) -> tuple[Calendar
     try:
         parsed = Calendar.from_ical(calendar.text)
     except ValueError as exc:
-        raise HandyCalendarError(f"iCal 解析失敗 url={calendar.url} reason=invalid_ics") from exc
+        raise Quote0Error(f"iCal 解析失敗 url={calendar.url} reason=invalid_ics") from exc
 
     window_start = datetime.combine(today, time.min, tzinfo=JST)
     window_end = datetime.combine(
@@ -173,7 +173,7 @@ def _parse_calendar_events(calendar: FetchedIcal, today: date) -> tuple[Calendar
         return tuple(events)
     except Exception as exc:
         # 展開・VEVENT 変換失敗も url 付きで返し、main の想定外エラーに落とさない
-        raise HandyCalendarError(
+        raise Quote0Error(
             f"iCal 解析失敗 url={calendar.url} reason=invalid_recurrence"
         ) from exc
 

@@ -34,7 +34,7 @@ flowchart LR
 ## 技術スタック
 
 - Python 3.12（[.python-version](./.python-version)）
-- pytest・Pillow・icalendar・recurring_ical_events・python-dotenv
+- pytest・Pillow・icalendar・recurring_ical_events・python-dotenv・httpx・pydantic
 - 運用は Linux 上の cron（[docs/deploy.md](./docs/deploy.md)）
 
 

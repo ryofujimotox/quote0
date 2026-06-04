@@ -7,7 +7,7 @@ from urllib.error import HTTPError
 
 import pytest
 
-from quote0.errors import HandyCalendarError
+from quote0_client.exceptions import Quote0Error
 from quote0.models import JST
 from quote0.steps import ical as ical_module
 from quote0.steps.ical import fetch_icals, parse_icals
@@ -125,7 +125,7 @@ def test_fetch_icals_fails_when_one_url_fails(monkeypatch: pytest.MonkeyPatch) -
 
     monkeypatch.setattr(ical_module, "urlopen", urlopen)
 
-    with pytest.raises(HandyCalendarError, match=f"iCal 取得失敗 url={ICS_URL_B} status=500"):
+    with pytest.raises(Quote0Error, match=f"iCal 取得失敗 url={ICS_URL_B} status=500"):
         fetch_icals(urls)
 
 
@@ -247,7 +247,7 @@ END:VCALENDAR
 
 def test_parse_icals_fails_on_invalid_recurrence_with_url() -> None:
     with pytest.raises(
-        HandyCalendarError,
+        Quote0Error,
         match=f"iCal 解析失敗 url={ICS_URL_A} reason=invalid_recurrence",
     ):
         parse_icals(
