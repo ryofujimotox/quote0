@@ -5,21 +5,12 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
-import httpx
-from quote0_client import Quote0Client
-from quote0_client.exceptions import (
-    AuthenticationError,
-    NotFoundError,
-    PermissionError,
-    Quote0Error,
-    RateLimitError,
-    ValidationError,
-)
-from quote0_client.models import ImageContentRequest
+from quote0_client.exceptions import Quote0Error
 
 from .config import load_config
 from .custom.ical_image import CustomIcalImageContentRequest
 from .custom.ical_image.ical_models import JST
+from .custom.jp_quote0_client import JpQuote0Client as Quote0Client
 
 
 def log_error(message: str) -> None:
@@ -32,41 +23,16 @@ def _batch_start_now() -> datetime:
     return datetime.now(JST)
 
 
-def _send_dot_image(
-    client: Quote0Client,
-    device_id: str,
-    content: ImageContentRequest,
-) -> None:
-    """Dot 画像送信。失敗時は日本語の Quote0Error に揃える。"""
-    try:
-        response = client.send_image(device_id, content)
-    except httpx.RequestError as exc:
-        raise Quote0Error(f"Dot 送信失敗 reason={exc}") from exc
-    except AuthenticationError as exc:
-        raise Quote0Error("Dot 送信失敗: API キーが無効です") from exc
-    except NotFoundError as exc:
-        raise Quote0Error(f"Dot 送信失敗: デバイスが見つかりません device_id={device_id}") from exc
-    except PermissionError as exc:
-        raise Quote0Error("Dot 送信失敗: 権限がありません") from exc
-    except ValidationError as exc:
-        raise Quote0Error("Dot 送信失敗: リクエストが不正です") from exc
-    except RateLimitError as exc:
-        raise Quote0Error("Dot 送信失敗: レート制限を超えました") from exc
-    except Quote0Error as exc:
-        raise Quote0Error(f"Dot 送信失敗: {exc}") from exc
-    if not response.success:
-        raise Quote0Error(f"Dot 送信失敗 code={response.code}")
-
-
 def main() -> int:
     """設定読込後、iCal 画像リクエストを組み立てて Dot へ送信する。"""
+    client = None
     try:
         # 設定を読み込む
         config = load_config()
         ical_urls = config.ical_urls
         dot_api_token = config.dot_api_token
         dot_device_id = config.dot_device_id
-        
+
         # iCal 画像リクエストを組み立てる
         reference_now = _batch_start_now()
         content = CustomIcalImageContentRequest(
@@ -77,23 +43,23 @@ def main() -> int:
             f"Dot 送信: device_id={dot_device_id}, bytes={len(content.image)}",
             flush=True,
         )
-        
+
         # Dot API を使用して画像を送信
         client = Quote0Client(api_key=dot_api_token)
-        try:
-            _send_dot_image(client, dot_device_id, content)
-        finally:
-            client.close()
+        client.send_image(dot_device_id, content)
     except Quote0Error as exc:
         log_error(f"起動失敗: {exc}")
         return 1
     except Exception as exc:
         log_error(f"起動失敗: 想定外のエラーです: {exc}")
         return 1
+    finally:
+        if client is not None:
+            client.close()
 
     print(
         "バッチ完了: iCal取得→解析→PNG→Dot送信 "
-        f"(ical_urls={len(config.ical_urls)}件, device_id={dot_device_id})",
+        f"(ical_urls={len(ical_urls)}件, device_id={dot_device_id})",
         flush=True,
     )
     return 0

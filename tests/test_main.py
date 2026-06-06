@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import httpx
-from quote0_client.exceptions import AuthenticationError, Quote0Error
+from quote0_client.exceptions import Quote0Error
 from quote0_client.models import APIResponse, ImageContentRequest
 
 from quote0 import main as main_module
@@ -143,7 +142,7 @@ def test_main_returns_non_zero_when_dot_send_fails(monkeypatch, capsys) -> None:
             pass
 
         def send_image(self, device_id: str, content: ImageContentRequest) -> APIResponse:
-            return APIResponse(code=400, message="bad")
+            raise Quote0Error("Dot 送信失敗 code=400")
 
         def close(self) -> None:
             pass
@@ -168,7 +167,7 @@ def test_main_returns_non_zero_when_dot_network_fails(monkeypatch, capsys) -> No
             pass
 
         def send_image(self, device_id: str, content: ImageContentRequest) -> APIResponse:
-            raise httpx.ConnectError("connection refused", request=httpx.Request("POST", "https://example.test"))
+            raise Quote0Error("Dot 送信失敗 reason=connection refused")
 
         def close(self) -> None:
             pass
@@ -193,7 +192,7 @@ def test_main_returns_non_zero_when_dot_auth_fails(monkeypatch, capsys) -> None:
             pass
 
         def send_image(self, device_id: str, content: ImageContentRequest) -> APIResponse:
-            raise AuthenticationError("Invalid API key or authentication failed")
+            raise Quote0Error("Dot 送信失敗: API キーが無効です")
 
         def close(self) -> None:
             pass
