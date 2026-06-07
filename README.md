@@ -3,6 +3,7 @@
 
 
 
+
 ## 目的
 
 電子ペーパーデバイス（Quote/0）を利用して、直近の予定が一目で分かるようにする。
@@ -13,7 +14,7 @@
 
 ## 概要
 
-公開 iCal から **今日・予定がある次の日** の予定を PNG にし、[Quote/0（Dot.）](https://dot.mindreset.tech/) の表示を更新する。
+公開 iCal から **今日・予定がある次の日** の予定を PNG に変換し、[Quote/0（Dot.）](https://dot.mindreset.tech/) の表示を更新する。
 
 ```mermaid
 flowchart LR
@@ -31,43 +32,72 @@ flowchart LR
 
 
 
+## 最低限の動作確認手順
+
+- 詳細な手順は [docs/deploy.md](./docs/deploy.md) を参照
+- Python **3.12** （[.python-version](./.python-version)）
+
+
+### 1. 環境構築
+
+```bash
+git clone https://github.com/ryofujimotox/quote0 && cd quote0
+python -m pip install -r requirements.txt
+cp -n .env.example .env
+```
+
+- `.env` を編集する。[AGENTS.md](./AGENTS.md) どおり。
+  - APIキー（`.env` の `DOT_API_TOKEN`）: [Dot. ドキュメント](https://dot.mindreset.tech/docs/service/open/get_api)
+  - デバイスID（`.env` の `DOT_DEVICE_ID`）: [Dot. ドキュメント](https://dot.mindreset.tech/docs/service/open/get_device_id)
+  - iCal URL（`.env` の `ICAL_URLS`）: [例）Google カレンダーの公開 URL](https://support.google.com/calendar/answer/37648?hl=ja#zippy=%2C%E3%82%AB%E3%83%AC%E3%83%B3%E3%83%80%E3%83%BC%E3%82%92%E8%A1%A8%E7%A4%BA%E3%81%99%E3%82%8B%E9%96%B2%E8%A6%A7%E3%81%AE%E3%81%BF)
+
+
+### 2. 手動実行
+
+```bash
+python -m quote0                          # Dot 接続を確認する
+python -m quote0.commands.get_devices     # 登録済みデバイス一覧を取得する
+python -m quote0.commands.send_ical       # 予定 PNG を Dot へ送信する
+```
+
+
 ## 技術スタック
 
 - Python 3.12（[.python-version](./.python-version)）
-- pytest・Pillow・icalendar・recurring_ical_events・python-dotenv・httpx・pydantic
-- 運用は Linux 上の cron（[docs/deploy.md](./docs/deploy.md)）
+- iCal（予定の取得・解析）
+- Dot API（Quote/0 表示更新）
+- pytest（単体テスト）
 
 
 
 ## 設計の要点
 
-- パイプラインは **iCal 取得 → 解析 → PNG 生成 → Dot 送信**。前段が成功したときだけ次へ進む
-- いずれかで失敗したときは **Dot は更新しない**（直前の表示を維持）
-- 抽出する予定は **JST の半開区間**（今日・次の予定日）
-- 並びは **URL 列挙順 → 開始時刻 → UID** で決定的
-- **1 枚の PNG** に最大 2 日分を載せる（詳細は [AGENTS.md](./AGENTS.md)）
+- **iCal 取得 → 解析 → PNG 生成 → Dot 送信** の順で実行
+- 抽出する予定は **今日と次の予定日**
+- 並びは **URL 列挙順 → 開始時刻 → UID**
 
 
 
-## ローカル単体テスト
+## フォルダ構成
 
-```bash
-python3.12 -m venv .venv
-.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
-.venv/bin/python -m pytest
 ```
+quote0/
+  main.py               # .env + Dot 接続確認（python -m quote0）
+  commands/             # 実行可能コマンド（get_devices / send_ical）
+  content/
+    ical_image/         # iCal → PNG
+    jp_quote0_client.py # Dot API アダプタ
+  vendor/               # SDK
 
-本番デプロイ・サーバ上の手順は [docs/deploy.md](./docs/deploy.md) を参照。
+tests/                  # 単体テスト（quote0/ と同じ階層）
+  commands/
+  content/
 
-
-
-## ドキュメント
-
-| ファイル | 内容 |
-|---------|------|
-| [AGENTS.md](./AGENTS.md) | 要件・振る舞い・単体テスト観点・骨組みの地図（仕様の正本） |
-| [docs/deploy.md](./docs/deploy.md) | セットアップ・更新・単体テスト実行手順 |
-| [docs/git.md](./docs/git.md) | Git 運用・コミットメッセージ |
-| [.env.example](./.env.example) | 環境変数名テンプレ |
-| [LICENSE](./LICENSE) | 本体（MIT）。フォントは [quote0/custom/ical_image/fonts/LICENSE](./quote0/custom/ical_image/fonts/LICENSE)（OFL） |
-| [quote0/vendor/quote0_client/LICENSE](./quote0/vendor/quote0_client/LICENSE) | Dot 送信用 SDK（MIT / YetYeti） |
+AGENTS.md               # 要件・振る舞い（仕様の正本）
+docs/deploy.md          # Linux 配置・cron
+docs/git.md             # Git 運用
+.env.example            # 環境変数名テンプレ
+LICENSE                 # 本体（MIT）
+quote0/content/ical_image/fonts/LICENSE   # フォント（OFL）
+quote0/vendor/quote0_client/LICENSE       # SDK（MIT）
+```
