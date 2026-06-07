@@ -7,11 +7,10 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from quote0.vendor.quote0_client.exceptions import Quote0Error
 
-from .errors import HandyCalendarError
 
-
-class ConfigError(HandyCalendarError, ValueError):
+class ConfigError(Quote0Error, ValueError):
     """設定不備を表す例外。"""
 
 

@@ -1,10 +1,10 @@
-"""pytest 共通 fixture。"""
+"""ical_image テスト用 fixture。"""
 
 from __future__ import annotations
 
 import pytest
 
-from quote0.steps.render import _load_fonts, _resolve_font_paths
+from quote0.custom.ical_image.render import _load_fonts, _resolve_font_paths
 
 
 @pytest.fixture(scope="module")

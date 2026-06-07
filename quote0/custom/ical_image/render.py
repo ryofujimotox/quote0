@@ -21,8 +21,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from ..errors import HandyCalendarError
-from ..models import CalendarEvent, CalendarWindow, DaySchedule, JST, PngImage
+from quote0.vendor.quote0_client.exceptions import Quote0Error
+from .ical_models import CalendarEvent, CalendarWindow, DaySchedule, JST, PngImage
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ class DisplayEvent:
 class DisplayDay:
     """上から順に描く 1 日分。"""
 
-    day: date
+    date: date
     header: str
     events: tuple[DisplayEvent, ...]
 
@@ -85,8 +85,8 @@ INK = (30, 34, 40)
 ACCENT = (39, 98, 166)
 DIVIDER = (90, 96, 108)
 
-# 環境差を避けるため、パッケージ同梱の Noto Sans JP のみ使う（quote0/fonts/）
-_FONTS_DIR = Path(__file__).resolve().parent.parent / "fonts"
+# 環境差を避けるため、同梱の Noto Sans JP のみ使う（custom/ical_image/fonts/）
+_FONTS_DIR = Path(__file__).resolve().parent / "fonts"
 REGULAR_FONT_PATH = _FONTS_DIR / "NotoSansJP-Regular.otf"
 BOLD_FONT_PATH = _FONTS_DIR / "NotoSansJP-Bold.otf"
 
@@ -139,31 +139,31 @@ RenderLine = DateHeaderLine | EventLine | DayDividerLine
 def build_display_days(calendar: CalendarWindow) -> tuple[DisplayDay, ...]:
     """CalendarWindow を上から描く日ブロック列に変換する。
 
-    例: CalendarWindow(today=…, next_day=…)
+    例: CalendarWindow(first_day=…, next_day=…)
         → (
-            DisplayDay(day=2026-05-29, header="今日（5/29金）", events=(…,)),
-            DisplayDay(day=2026-06-02, header="3日後（6/2月）", events=(…,)),
+            DisplayDay(date=2026-05-29, header="今日（5/29金）", events=(…,)),
+            DisplayDay(date=2026-06-02, header="3日後（6/2月）", events=(…,)),
           )
     """
-    reference_today = calendar.today.day
+    first_date = calendar.first_day.date
     return (
-        _display_day_from_schedule(calendar.today, reference_today),
-        _display_day_from_schedule(calendar.next_day, reference_today),
+        _display_day_from_schedule(calendar.first_day, first_date),
+        _display_day_from_schedule(calendar.next_day, first_date),
     )
 
 
-def _display_day_from_schedule(schedule: DaySchedule, reference_today: date) -> DisplayDay:
+def _display_day_from_schedule(schedule: DaySchedule, first_date: date) -> DisplayDay:
     return DisplayDay(
-        day=schedule.day,
-        header=_format_date_header(schedule.day, reference_today),
-        events=tuple(_display_event_from_calendar(event, schedule.day) for event in schedule.events),
+        date=schedule.date,
+        header=_format_date_header(schedule.date, first_date),
+        events=tuple(_display_event_from_calendar(event, schedule.date) for event in schedule.events),
     )
 
 
-def _display_event_from_calendar(event: CalendarEvent, display_day: date) -> DisplayEvent:
+def _display_event_from_calendar(event: CalendarEvent, display_date: date) -> DisplayEvent:
     if event.all_day:
         return DisplayEvent(event=event, time_suffix=None)
-    if _is_carry_over_on_day(event, display_day):
+    if _is_carry_over_on_day(event, display_date):
         return DisplayEvent(event=event, time_suffix=_carry_over_time_suffix(event))
     start_text, end_text = _event_time_parts(event)
     return DisplayEvent(
@@ -177,7 +177,7 @@ def render_png(calendar: CalendarWindow) -> PngImage:
     display_days = build_display_days(calendar)
     print(
         "PNG 生成: "
-        f"{display_days[0].day.isoformat()} / {display_days[1].day.isoformat()}"
+        f"{display_days[0].date.isoformat()} / {display_days[1].date.isoformat()}"
     )
     regular_path, bold_path = _resolve_font_paths()
     fonts = _load_fonts(regular_path, bold_path)
@@ -227,12 +227,12 @@ def _build_lines(display_days: tuple[DisplayDay, ...]) -> list[RenderLine]:
     return lines
 
 
-def _format_date_header(day: date, reference_today: date) -> str:
+def _format_date_header(day: date, first_date: date) -> str:
     weekdays = ("月", "火", "水", "木", "金", "土", "日")
     date_text = f"{day.month}/{day.day}{weekdays[day.weekday()]}"
-    if day == reference_today:
+    if day == first_date:
         return f"今日（{date_text}）"
-    delta_days = (day - reference_today).days
+    delta_days = (day - first_date).days
     if delta_days == 1:
         return f"明日（{date_text}）"
     return f"{delta_days}日後（{date_text}）"
@@ -241,13 +241,13 @@ def _format_date_header(day: date, reference_today: date) -> str:
 # --- 予定行: 「予定名」+「（時刻）」を横並び ---
 
 
-def _event_start_day(event: CalendarEvent) -> date:
+def _event_start_date(event: CalendarEvent) -> date:
     return event.period.start.astimezone(JST).date()
 
 
-def _is_carry_over_on_day(event: CalendarEvent, display_day: date) -> bool:
+def _is_carry_over_on_day(event: CalendarEvent, display_date: date) -> bool:
     """表示日より前に開始した timed 予定（今日枠の持ち越し）。"""
-    return not event.all_day and _event_start_day(event) < display_day
+    return not event.all_day and _event_start_date(event) < display_date
 
 
 def _carry_over_time_suffix(event: CalendarEvent) -> str:
@@ -445,7 +445,7 @@ def _resolve_font_paths() -> tuple[Path, Path]:
     """同梱フォントの存在を確認し、Regular / Bold のパスを返す。"""
     missing = [path for path in (REGULAR_FONT_PATH, BOLD_FONT_PATH) if not path.exists()]
     if missing:
-        raise HandyCalendarError(
+        raise Quote0Error(
             "PNG 生成失敗 reason=bundled_font_missing "
             + " ".join(f"path={path}" for path in missing)
         )

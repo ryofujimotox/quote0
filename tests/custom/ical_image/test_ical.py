@@ -7,12 +7,12 @@ from urllib.error import HTTPError
 
 import pytest
 
-from quote0.errors import HandyCalendarError
-from quote0.models import JST
-from quote0.steps import ical as ical_module
-from quote0.steps.ical import fetch_icals, parse_icals
+from quote0.vendor.quote0_client.exceptions import Quote0Error
+from quote0.custom.ical_image.ical_models import JST
+from quote0.custom.ical_image import ical as ical_module
+from quote0.custom.ical_image.ical import fetch_icals, parse_icals
 
-from tests.factories import (
+from tests.custom.ical_image.factories import (
     FakeResponse,
     ICS_URL_A,
     ICS_URL_B,
@@ -125,12 +125,12 @@ def test_fetch_icals_fails_when_one_url_fails(monkeypatch: pytest.MonkeyPatch) -
 
     monkeypatch.setattr(ical_module, "urlopen", urlopen)
 
-    with pytest.raises(HandyCalendarError, match=f"iCal 取得失敗 url={ICS_URL_B} status=500"):
+    with pytest.raises(Quote0Error, match=f"iCal 取得失敗 url={ICS_URL_B} status=500"):
         fetch_icals(urls)
 
 
 def test_parse_icals_returns_today_and_next_day_frames() -> None:
-    assert parse_icals((), REFERENCE_TODAY, reference_now=REFERENCE_NOW) == make_empty_window()
+    assert parse_icals((), reference_now=REFERENCE_NOW) == make_empty_window()
 
 
 def test_parse_icals_extracts_events_by_frame_rule_and_sorts_deterministically() -> None:
@@ -139,15 +139,14 @@ def test_parse_icals_extracts_events_by_frame_rule_and_sorts_deterministically()
             make_fetched_ical(MULTI_SOURCE_ICS_A, source_index=0, url=ICS_URL_A),
             make_fetched_ical(MULTI_SOURCE_ICS_B, source_index=1, url=ICS_URL_B),
         ),
-        REFERENCE_TODAY,
         reference_now=REFERENCE_NOW,
     )
 
-    assert window.next_day.day == REFERENCE_TOMORROW
+    assert window.next_day.date == REFERENCE_TOMORROW
     assert_window_event_uids(
         window,
-        today=("same-a", "same-b", "night", "early"),
-        next_day=("tomorrow",),
+        first_day=("same-a", "same-b", "night", "early"),
+        next=("tomorrow",),
     )
 
 
@@ -166,26 +165,25 @@ END:VCALENDAR
 
     window = parse_icals(
         (make_fetched_ical(carry_over_ics),),
-        REFERENCE_TOMORROW,
         reference_now=just_after_midnight,
     )
 
-    assert tuple(event.uid for event in window.today.events) == ("carry-over",)
+    assert tuple(event.uid for event in window.first_day.events) == ("carry-over",)
     assert window.next_day.events == ()
 
 
 def test_parse_icals_normalizes_all_day_events_to_jst_day_range() -> None:
     all_day = make_all_day_event("all-day", title="終日")
 
-    window = parse_icals((make_fetched_ical(ALL_DAY_ICS),), REFERENCE_TODAY, reference_now=REFERENCE_NOW)
+    window = parse_icals((make_fetched_ical(ALL_DAY_ICS),), reference_now=REFERENCE_NOW)
 
     assert window == make_window(next_day_events=(all_day,))
 
 
 def test_parse_icals_skips_empty_days_to_next_event_day() -> None:
-    window = parse_icals((make_fetched_ical(SKIP_TOMORROW_ICS),), REFERENCE_TODAY, reference_now=REFERENCE_NOW)
+    window = parse_icals((make_fetched_ical(SKIP_TOMORROW_ICS),), reference_now=REFERENCE_NOW)
 
-    assert window.next_day.day == REFERENCE_DAY_PLUS_3
+    assert window.next_day.date == REFERENCE_DAY_PLUS_3
     assert tuple(event.uid for event in window.next_day.events) == ("later",)
 
 
@@ -203,11 +201,10 @@ END:VCALENDAR
 
     window = parse_icals(
         (make_fetched_ical(today_only_ics),),
-        REFERENCE_TODAY,
         reference_now=REFERENCE_NOW,
     )
 
-    assert window.next_day.day == REFERENCE_TOMORROW
+    assert window.next_day.date == REFERENCE_TOMORROW
     assert window.next_day.events == ()
 
 
@@ -225,11 +222,11 @@ END:VCALENDAR
 
 
 def test_parse_icals_expands_recurring_events_for_today() -> None:
-    window = parse_icals((make_fetched_ical(RECURRING_ICS),), REFERENCE_TODAY, reference_now=REFERENCE_NOW)
+    window = parse_icals((make_fetched_ical(RECURRING_ICS),), reference_now=REFERENCE_NOW)
 
-    assert len(window.today.events) == 1
-    assert window.today.events[0].uid == "weekly"
-    assert window.today.events[0].title == "定例"
+    assert len(window.first_day.events) == 1
+    assert window.first_day.events[0].uid == "weekly"
+    assert window.first_day.events[0].title == "定例"
 
 
 INVALID_RECURRENCE_ICS = """BEGIN:VCALENDAR
@@ -247,12 +244,11 @@ END:VCALENDAR
 
 def test_parse_icals_fails_on_invalid_recurrence_with_url() -> None:
     with pytest.raises(
-        HandyCalendarError,
+        Quote0Error,
         match=f"iCal 解析失敗 url={ICS_URL_A} reason=invalid_recurrence",
     ):
         parse_icals(
             (make_fetched_ical(INVALID_RECURRENCE_ICS, url=ICS_URL_A),),
-            REFERENCE_TODAY,
             reference_now=REFERENCE_NOW,
         )
 
@@ -270,10 +266,10 @@ END:VCALENDAR
 
 
 def test_parse_icals_includes_one_off_events_beyond_recurrence_window() -> None:
-    window = parse_icals((make_fetched_ical(FAR_ONE_OFF_ICS),), REFERENCE_TODAY, reference_now=REFERENCE_NOW)
+    window = parse_icals((make_fetched_ical(FAR_ONE_OFF_ICS),), reference_now=REFERENCE_NOW)
 
-    assert window.today.events == ()
-    assert window.next_day.day == date(2026, 9, 1)
+    assert window.first_day.events == ()
+    assert window.next_day.date == date(2026, 9, 1)
     assert tuple(event.uid for event in window.next_day.events) == ("far-future",)
 
 
@@ -300,11 +296,10 @@ END:VCALENDAR
 def test_parse_icals_skips_recurrence_id_outside_expansion_window() -> None:
     window = parse_icals(
         (make_fetched_ical(RECURRENCE_OVERRIDE_FAR_ICS),),
-        REFERENCE_TODAY,
         reference_now=REFERENCE_NOW,
     )
 
-    assert window.next_day.day == date(2026, 6, 5)
+    assert window.next_day.date == date(2026, 6, 5)
     assert tuple(event.uid for event in window.next_day.events) == ("series",)
 
 
@@ -327,9 +322,9 @@ END:VCALENDAR
 """
     noon = datetime(2026, 5, 29, 12, 0, tzinfo=JST)
 
-    window = parse_icals((make_fetched_ical(today_only_ics),), REFERENCE_TODAY, reference_now=noon)
+    window = parse_icals((make_fetched_ical(today_only_ics),), reference_now=noon)
 
-    assert tuple(event.uid for event in window.today.events) == ("upcoming",)
+    assert tuple(event.uid for event in window.first_day.events) == ("upcoming",)
 
 
 ALL_DAY_TODAY_ICS = """BEGIN:VCALENDAR
@@ -347,6 +342,6 @@ END:VCALENDAR
 def test_parse_icals_keeps_all_day_events_on_today_until_day_end() -> None:
     evening = datetime(2026, 5, 29, 20, 0, tzinfo=JST)
 
-    window = parse_icals((make_fetched_ical(ALL_DAY_TODAY_ICS),), REFERENCE_TODAY, reference_now=evening)
+    window = parse_icals((make_fetched_ical(ALL_DAY_TODAY_ICS),), reference_now=evening)
 
-    assert tuple(event.uid for event in window.today.events) == ("all-day-today",)
+    assert tuple(event.uid for event in window.first_day.events) == ("all-day-today",)

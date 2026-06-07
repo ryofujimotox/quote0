@@ -1,4 +1,4 @@
-"""steps テスト共通の入力データ・フェイク HTTP。"""
+"""ical_image テスト共通の入力データ・フェイク HTTP。"""
 
 from __future__ import annotations
 
@@ -7,9 +7,17 @@ from datetime import date, datetime, timedelta
 from email.message import Message
 
 from quote0.config import AppConfig
-from quote0.models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, FetchedIcal, JST, PngImage
-from quote0.steps.ical import day_range
-from quote0.steps.render import DisplayDay, DisplayEvent, EVENT_LINE_WIDTH
+from quote0.custom.ical_image.ical_models import (
+    CalendarEvent,
+    CalendarWindow,
+    DateRange,
+    DaySchedule,
+    FetchedIcal,
+    JST,
+    PngImage,
+)
+from quote0.custom.ical_image.ical import day_range
+from quote0.custom.ical_image.render import DisplayDay, DisplayEvent, EVENT_LINE_WIDTH
 
 # テスト全体で基準日を揃える（2026-05-29 = 金曜）
 REFERENCE_TODAY = date(2026, 5, 29)
@@ -78,28 +86,36 @@ def make_all_day_event(
 
 
 def make_empty_window(
-    base_day: date = REFERENCE_TODAY,
+    first_date: date = REFERENCE_TODAY,
     *,
-    next_day: date | None = None,
+    next_date: date | None = None,
 ) -> CalendarWindow:
-    second_day = next_day or (base_day + timedelta(days=1))
+    second_frame_date = next_date or (first_date + timedelta(days=1))
     return CalendarWindow(
-        today=DaySchedule(day=base_day, period=day_range(base_day), events=()),
-        next_day=DaySchedule(day=second_day, period=day_range(second_day), events=()),
+        first_day=DaySchedule(date=first_date, period=day_range(first_date), events=()),
+        next_day=DaySchedule(
+            date=second_frame_date,
+            period=day_range(second_frame_date),
+            events=(),
+        ),
     )
 
 
 def make_window(
     *,
-    base_day: date = REFERENCE_TODAY,
-    today_events: tuple[CalendarEvent, ...] = (),
-    next_day: date | None = None,
+    first_date: date = REFERENCE_TODAY,
+    first_day_events: tuple[CalendarEvent, ...] = (),
+    next_date: date | None = None,
     next_day_events: tuple[CalendarEvent, ...] = (),
 ) -> CalendarWindow:
-    second_day = next_day or (base_day + timedelta(days=1))
+    second_frame_date = next_date or (first_date + timedelta(days=1))
     return CalendarWindow(
-        today=DaySchedule(day=base_day, period=day_range(base_day), events=today_events),
-        next_day=DaySchedule(day=second_day, period=day_range(second_day), events=next_day_events),
+        first_day=DaySchedule(date=first_date, period=day_range(first_date), events=first_day_events),
+        next_day=DaySchedule(
+            date=second_frame_date,
+            period=day_range(second_frame_date),
+            events=next_day_events,
+        ),
     )
 
 
@@ -115,7 +131,7 @@ def make_fetched_ical(
 def make_window_with_timed_events() -> CalendarWindow:
     """build_display_days / _build_lines で使う代表例（今日・次の予定日に 1 件ずつ）。"""
     return make_window(
-        today_events=(make_timed_event("today", start=(10, 0), end=(10, 30)),),
+        first_day_events=(make_timed_event("today", start=(10, 0), end=(10, 30)),),
         next_day_events=(
             make_timed_event("tomorrow", day=REFERENCE_TOMORROW, start=(15, 0), end=(16, 0)),
         ),
@@ -124,11 +140,11 @@ def make_window_with_timed_events() -> CalendarWindow:
 
 def display_day(
     *,
-    day: date,
+    date: date,
     header: str,
     events: tuple[DisplayEvent, ...] = (),
 ) -> DisplayDay:
-    return DisplayDay(day=day, header=header, events=events)
+    return DisplayDay(date=date, header=header, events=events)
 
 
 def timed_display(event: CalendarEvent, time_suffix: str) -> DisplayEvent:
@@ -140,25 +156,25 @@ def all_day_display(event: CalendarEvent) -> DisplayEvent:
 
 
 def empty_today_display_day() -> DisplayDay:
-    return display_day(day=REFERENCE_TODAY, header="今日（5/29金）")
+    return display_day(date=REFERENCE_TODAY, header="今日（5/29金）")
 
 
 def empty_next_day_display_day(
     *,
-    day: date = REFERENCE_TOMORROW,
+    date: date = REFERENCE_TOMORROW,
     header: str = "明日（5/30土）",
 ) -> DisplayDay:
-    return display_day(day=day, header=header)
+    return display_day(date=date, header=header)
 
 
 def assert_window_event_uids(
     window: CalendarWindow,
     *,
-    today: tuple[str, ...],
-    next_day: tuple[str, ...],
+    first_day: tuple[str, ...],
+    next: tuple[str, ...],
 ) -> None:
-    assert tuple(event.uid for event in window.today.events) == today
-    assert tuple(event.uid for event in window.next_day.events) == next_day
+    assert tuple(event.uid for event in window.first_day.events) == first_day
+    assert tuple(event.uid for event in window.next_day.events) == next
 
 
 class FakeResponse:

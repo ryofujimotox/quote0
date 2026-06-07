@@ -5,12 +5,12 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
+from quote0.vendor.quote0_client.exceptions import Quote0Error
+
 from .config import load_config
-from .errors import HandyCalendarError
-from .models import JST
-from .steps.dot import send_dot_image
-from .steps.ical import fetch_icals, parse_icals
-from .steps.render import render_png
+from .custom.ical_image import CustomIcalImageContentRequest
+from .custom.ical_image.ical_models import JST
+from .custom.jp_quote0_client import JpQuote0Client as Quote0Client
 
 
 def log_error(message: str) -> None:
@@ -24,33 +24,42 @@ def _batch_start_now() -> datetime:
 
 
 def main() -> int:
-    """設定読込後、iCal 取得 → 解析 → PNG 生成 → Dot 送信を順に実行する。"""
+    """設定読込後、iCal 画像リクエストを組み立てて Dot へ送信する。"""
+    client = None
     try:
+        # 設定を読み込む
         config = load_config()
-        # 基準日・終了済み判定は取得前の同一時刻を使う（取得中の経過で判定がずれない）
-        started_at = _batch_start_now()
-        today = started_at.date()
-        calendars = fetch_icals(config.ical_urls)
-        print(f"iCal 取得完了: {len(calendars)}件", flush=True)
-        calendar = parse_icals(calendars, today, reference_now=started_at)
+        ical_urls = config.ical_urls
+        dot_api_token = config.dot_api_token
+        dot_device_id = config.dot_device_id
+
+        # iCal 画像リクエストを組み立てる
+        reference_now = _batch_start_now()
+        content = CustomIcalImageContentRequest(
+            ical_urls=ical_urls,
+            reference_now=reference_now,
+        ).to_image_content_request()
         print(
-            "iCal 解析完了: "
-            f"today={len(calendar.today.events)}件, "
-            f"next_day={calendar.next_day.day.isoformat()}({len(calendar.next_day.events)}件)",
+            f"Dot 送信: device_id={dot_device_id}, bytes={len(content.image)}",
             flush=True,
         )
-        image = render_png(calendar)
-        send_dot_image(config, image)
-    except HandyCalendarError as exc:
+
+        # Dot API を使用して画像を送信
+        client = Quote0Client(api_key=dot_api_token)
+        client.send_image(dot_device_id, content)
+    except Quote0Error as exc:
         log_error(f"起動失敗: {exc}")
         return 1
     except Exception as exc:
         log_error(f"起動失敗: 想定外のエラーです: {exc}")
         return 1
+    finally:
+        if client is not None:
+            client.close()
 
     print(
         "バッチ完了: iCal取得→解析→PNG→Dot送信 "
-        f"(ical_urls={len(config.ical_urls)}件, device_id={config.dot_device_id})",
+        f"(ical_urls={len(ical_urls)}件, device_id={dot_device_id})",
         flush=True,
     )
     return 0
