@@ -12,7 +12,7 @@
 | OS | **Linux** | - |
 | タイムゾーン | ホスト OS を **Asia/Tokyo** に設定する | cron の時刻はホスト OS のタイムゾーンで解釈する |
 | 配置 | `/home/scripts/quote0/` に配置する | 初回の取得は「セットアップ」の `git clone` |
-| 実行 | 毎日 **0:00 JST** に cron で `.venv/bin/python -m quote0` を実行 | 手動実行は「動作確認」 |
+| 実行 | 毎日 **0:00 JST** に cron で `.venv/bin/python -m quote0.commands.send_ical` を実行 | 手動実行は「動作確認」 |
 | 秘密情報 | `.env` | [AGENTS.md](../AGENTS.md) の「設定（環境変数）」。作成・設定は「環境変数（`.env`）」 |
 | Python | ホスト **3.12**（`.python-version`） | `python3.12` が無いときは「Python 3.12 のインストール」 |
 
@@ -52,7 +52,7 @@ chmod 600 .env
 
 ```bash
 cd /home/scripts/quote0
-.venv/bin/python -m quote0
+.venv/bin/python -m quote0.commands.send_ical
 echo $?
 ```
 
@@ -84,7 +84,7 @@ crontab -e
 ```
 
 ```cron
-0 0 * * * cd /home/scripts/quote0 && .venv/bin/python -m quote0
+0 0 * * * cd /home/scripts/quote0 && .venv/bin/python -m quote0.commands.send_ical
 ```
 
 `crontab -l` で登録内容を確認する。
@@ -109,7 +109,7 @@ git pull
 
 `.python-version` を上げたときは、文末「Python 3.12 のインストール」のあと、下記で `.venv` を作り直す。
 
-`/home/scripts/handy-calendar` から移行するときは clone 先を `/home/scripts/quote0` にし、cron のパスと `python -m quote0` に合わせる。
+`/home/scripts/quote0` から移行するときは clone 先を `/home/scripts/quote0` にし、cron のパスと `python -m quote0.commands.send_ical` に合わせる。
 
 ```bash
 cd /home/scripts/quote0
