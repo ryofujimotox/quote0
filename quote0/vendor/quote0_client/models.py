@@ -16,12 +16,18 @@ class Device(BaseModel):
         model: Device model (e.g., 'quote_0')
         edition: Device edition (1 or 2)
         id: Device serial number
+        alias: Optional device alias
+        location: Optional device location
     """
 
     series: str = Field(description="Device series (e.g., 'quote')")
     model: str = Field(description="Device model (e.g., 'quote_0')")
     edition: int = Field(description="Device edition (1 or 2)")
     id: str = Field(description="Device serial number")
+    alias: Optional[str] = Field(default=None, description="Optional device alias")
+    location: Optional[str] = Field(
+        default=None, description="Optional device location"
+    )
 
 
 class BatteryStatus(BaseModel):
