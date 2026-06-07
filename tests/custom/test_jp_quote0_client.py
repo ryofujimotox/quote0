@@ -6,7 +6,7 @@ import json
 
 import httpx
 import pytest
-from quote0_client.exceptions import AuthenticationError, Quote0Error, ValidationError
+from quote0.vendor.quote0_client.exceptions import AuthenticationError, Quote0Error, ValidationError
 
 from quote0.custom.jp_quote0_client import JpQuote0Client
 

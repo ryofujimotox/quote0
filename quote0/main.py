@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
-from quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.exceptions import Quote0Error
 
 from .config import load_config
 from .custom.ical_image import CustomIcalImageContentRequest

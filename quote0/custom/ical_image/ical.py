@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 from icalendar import Calendar
 from recurring_ical_events import of as recurring_events_of
 
-from quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.exceptions import Quote0Error
 from .ical_models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, FetchedIcal, JST
 
 

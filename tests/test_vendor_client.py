@@ -1,4 +1,4 @@
-"""vendor/quote0_client の単体テスト。"""
+"""quote0/vendor/quote0_client の単体テスト。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import httpx
 
-from quote0_client.client import Quote0Client, _api_response_from_http
+from quote0.vendor.quote0_client.client import Quote0Client, _api_response_from_http
 
 
 def _fake_response(*, status: int, payload: object) -> httpx.Response:

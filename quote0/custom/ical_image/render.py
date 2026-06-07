@@ -21,7 +21,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.exceptions import Quote0Error
 from .ical_models import CalendarEvent, CalendarWindow, DaySchedule, JST, PngImage
 
 

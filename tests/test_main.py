@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from quote0_client.exceptions import Quote0Error
-from quote0_client.models import APIResponse, ImageContentRequest
+from quote0.vendor.quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.models import APIResponse, ImageContentRequest
 
 from quote0 import main as main_module
 from quote0.custom.ical_image import CustomIcalImageContentRequest

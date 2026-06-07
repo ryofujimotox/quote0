@@ -11,7 +11,7 @@ import pytest
 
 from datetime import datetime
 
-from quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.exceptions import Quote0Error
 from quote0.custom.ical_image.ical_models import JST
 from quote0.custom.ical_image.ical import parse_icals
 from quote0.custom.ical_image.render import (

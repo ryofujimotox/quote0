@@ -7,7 +7,7 @@ from urllib.error import HTTPError
 
 import pytest
 
-from quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.exceptions import Quote0Error
 from quote0.custom.ical_image.ical_models import JST
 from quote0.custom.ical_image import ical as ical_module
 from quote0.custom.ical_image.ical import fetch_icals, parse_icals

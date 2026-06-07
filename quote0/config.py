@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.exceptions import Quote0Error
 
 
 class ConfigError(Quote0Error, ValueError):

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import httpx
-from quote0_client import Quote0Client
-from quote0_client.exceptions import (
+from quote0.vendor.quote0_client import Quote0Client
+from quote0.vendor.quote0_client.exceptions import (
     AuthenticationError,
     NotFoundError,
     PermissionError,
@@ -12,7 +12,7 @@ from quote0_client.exceptions import (
     RateLimitError,
     ValidationError,
 )
-from quote0_client.models import ImageContentRequest
+from quote0.vendor.quote0_client.models import ImageContentRequest
 
 
 class JpQuote0Client(Quote0Client):

@@ -70,4 +70,4 @@ python3.12 -m venv .venv
 | [docs/git.md](./docs/git.md) | Git 運用・コミットメッセージ |
 | [.env.example](./.env.example) | 環境変数名テンプレ |
 | [LICENSE](./LICENSE) | 本体（MIT）。フォントは [quote0/custom/ical_image/fonts/LICENSE](./quote0/custom/ical_image/fonts/LICENSE)（OFL） |
-| [vendor/quote0_client/LICENSE](./vendor/quote0_client/LICENSE) | Dot 送信用 SDK（MIT / YetYeti） |
+| [quote0/vendor/quote0_client/LICENSE](./quote0/vendor/quote0_client/LICENSE) | Dot 送信用 SDK（MIT / YetYeti） |

@@ -6,7 +6,7 @@ import base64
 from datetime import date, datetime, timezone
 
 import pytest
-from quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.exceptions import Quote0Error
 
 from quote0.custom.ical_image import CustomIcalImageContentRequest, png_to_image_content_request
 from quote0.custom.ical_image import request as request_module

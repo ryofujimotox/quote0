@@ -6,8 +6,8 @@ import base64
 from dataclasses import dataclass
 from datetime import datetime
 
-from quote0_client.exceptions import Quote0Error
-from quote0_client.models import ImageContentRequest
+from quote0.vendor.quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.models import ImageContentRequest
 
 from .ical import fetch_icals, parse_icals
 from .ical_models import JST, PngImage
