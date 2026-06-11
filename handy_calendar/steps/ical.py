@@ -34,14 +34,13 @@ def day_range(day: date) -> DateRange:
     return DateRange(start=start, end=start + timedelta(days=1))
 
 
-def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
+def fetch_icals(urls: tuple[str, ...], *, debug: bool = False) -> tuple[FetchedIcal, ...]:
     """公開 ICS URL を URL 列挙順で全件取得する。
 
     例: ("https://cal.example/a.ics", "https://cal.example/b.ics")
         → (FetchedIcal(0, "https://cal.example/a.ics", "BEGIN:VCALENDAR…"),
            FetchedIcal(1, "https://cal.example/b.ics", "BEGIN:VCALENDAR…"))
     """
-    print(f"iCal 取得: {len(urls)}件", flush=True)
     fetched: list[FetchedIcal] = []
     for index, url in enumerate(urls):
         request = Request(url, headers={"User-Agent": "handy-calendar/0"})
@@ -51,8 +50,15 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
                 if status < 200 or status >= 300:
                     raise HandyCalendarError(f"iCal 取得失敗 url={url} status={status}")
                 content = response.read()
-                text = _decode_ics(content, response.headers)
-                print(f"iCal 取得詳細: source={index}, bytes={len(content)}", flush=True)
+                try:
+                    text = _decode_ics(content, response.headers)
+                except (LookupError, UnicodeDecodeError) as exc:
+                    charset = _ics_charset(response.headers)
+                    raise HandyCalendarError(
+                        f"iCal 取得失敗 url={url} reason=decode_failed charset={charset}"
+                    ) from exc
+                if debug:
+                    print(f"iCal 取得詳細: source={index}, bytes={len(content)}, url={url}", flush=True)
                 fetched.append(FetchedIcal(source_index=index, url=url, text=text))
         except HTTPError as exc:
             raise HandyCalendarError(f"iCal 取得失敗 url={url} status={exc.code}") from exc
@@ -68,6 +74,7 @@ def parse_icals(
     today: date,
     *,
     reference_now: datetime | None = None,
+    debug: bool = False,
 ) -> CalendarWindow:
     """取得済み ICS から今日・次の予定日の予定を抽出する。
 
@@ -82,20 +89,20 @@ def parse_icals(
           )
     """
     now = reference_now or datetime.now(JST)
-    print(f"iCal 解析: {len(calendars)}件", flush=True)
     today_period = day_range(today)
     events = _sorted_events(
         event for calendar in calendars for event in _parse_calendar_events(calendar, today)
     )
-    print(f"iCal 解析詳細: total_events={len(events)}", flush=True)
-    for event in events:
-        print(
-            "iCal 予定: "
-            f"source={event.source_index}, uid={event.uid}, title={event.title}, "
-            f"start={event.period.start.isoformat()}, end={event.period.end.isoformat()}, "
-            f"all_day={event.all_day}",
-            flush=True,
-        )
+    if debug:
+        print(f"iCal 解析詳細: total_events={len(events)}", flush=True)
+        for event in events:
+            print(
+                "iCal 予定: "
+                f"source={event.source_index}, uid={event.uid}, title={event.title}, "
+                f"start={event.period.start.isoformat()}, end={event.period.end.isoformat()}, "
+                f"all_day={event.all_day}, url={event.source_url}",
+                flush=True,
+            )
     next_day = _find_next_event_day(events, today)
     next_day_period = day_range(next_day)
     # 今日枠は overlap（前日開始の進行中も載せる）。2枠目は開始日のみ（日跨ぎの二重表示を避ける）
@@ -129,8 +136,12 @@ def _days_with_events_after(events: tuple[CalendarEvent, ...], today: date) -> t
 
 def _decode_ics(content: bytes, headers: Message) -> str:
     """HTTPヘッダーの charset があれば使い、なければ UTF-8 として読む。"""
-    charset = headers.get_content_charset() or "utf-8"
-    return content.decode(charset)
+    return content.decode(_ics_charset(headers))
+
+
+def _ics_charset(headers: Message) -> str:
+    """エラー時も同じ charset 名をログへ残す。"""
+    return headers.get_content_charset() or "utf-8"
 
 
 def _parse_calendar_events(calendar: FetchedIcal, today: date) -> tuple[CalendarEvent, ...]:
@@ -147,14 +158,15 @@ def _parse_calendar_events(calendar: FetchedIcal, today: date) -> tuple[Calendar
     )
     try:
         events: list[CalendarEvent] = []
-        seen: set[tuple[str, date | datetime]] = set()
+        seen: set[tuple[object, ...]] = set()
+        cancelled_occurrences = _cancelled_occurrence_keys(parsed)
 
         def add_component(component) -> None:
-            if component.get("DTSTART") is None:
+            if component.get("DTSTART") is None or _is_cancelled(component):
                 return
-            uid = str(component.get("UID") or "")
-            dtstart = component.decoded("DTSTART")
-            key = (uid, dtstart)
+            if _occurrence_key(component) in cancelled_occurrences:
+                return
+            key = _dedupe_key(component)
             if key in seen:
                 return
             seen.add(key)
@@ -177,6 +189,44 @@ def _parse_calendar_events(calendar: FetchedIcal, today: date) -> tuple[Calendar
             f"iCal 解析失敗 url={calendar.url} reason=invalid_recurrence"
         ) from exc
 
+
+
+def _cancelled_occurrence_keys(parsed: Calendar) -> set[tuple[str, date | datetime]]:
+    """キャンセル例外が指す発生回。元の回を復活させないために先に集める。"""
+    keys: set[tuple[str, date | datetime]] = set()
+    for component in parsed.walk("VEVENT"):
+        if not _is_cancelled(component):
+            continue
+        recurrence_id = component.get("RECURRENCE-ID")
+        if recurrence_id is None:
+            continue
+        uid = str(component.get("UID") or "")
+        keys.add((uid, component.decoded("RECURRENCE-ID")))
+    return keys
+
+
+def _is_cancelled(component) -> bool:
+    """STATUS:CANCELLED は表示しない。"""
+    return str(component.get("STATUS") or "").upper() == "CANCELLED"
+
+
+def _occurrence_key(component) -> tuple[str, date | datetime]:
+    uid = str(component.get("UID") or "")
+    return (uid, component.decoded("DTSTART"))
+
+
+def _dedupe_key(component) -> tuple[object, ...]:
+    """between と walk の同一 VEVENT だけを畳む。壊れた UID で別予定を落とさない。"""
+    dtstart = component.decoded("DTSTART")
+    dtend = component.decoded("DTEND") if component.get("DTEND") is not None else None
+    duration = component.decoded("DURATION") if component.get("DURATION") is not None else None
+    return (
+        str(component.get("UID") or ""),
+        dtstart,
+        dtend,
+        duration,
+        str(component.get("SUMMARY") or ""),
+    )
 
 def _event_from_component(calendar: FetchedIcal, component) -> CalendarEvent:
     dtstart = component.decoded("DTSTART")

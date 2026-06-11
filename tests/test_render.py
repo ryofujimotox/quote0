@@ -26,6 +26,7 @@ from handy_calendar.steps.render import (
     DateHeaderLine,
     DayDividerLine,
     EventLine,
+    EmptyDayLine,
     EVENT_LINE_WIDTH,
     _build_lines,
     _fit_title_and_time,
@@ -208,6 +209,18 @@ def test_build_lines_interleaves_headers_events_and_divider() -> None:
         DayDividerLine(),
         DateHeaderLine("明日（5/30土）", emphasized=False),
         EventLine(next_day_block.events[0], emphasized=False),
+    ]
+
+
+def test_build_lines_adds_empty_day_text_line() -> None:
+    today_block, next_day_block = build_display_days(make_empty_window())
+
+    assert _build_lines((today_block, next_day_block)) == [
+        DateHeaderLine("今日（5/29金）", emphasized=True),
+        EmptyDayLine(emphasized=True),
+        DayDividerLine(),
+        DateHeaderLine("明日（5/30土）", emphasized=False),
+        EmptyDayLine(emphasized=False),
     ]
 
 

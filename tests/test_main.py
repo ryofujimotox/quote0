@@ -23,9 +23,10 @@ def test_main_runs_steps_in_order(monkeypatch) -> None:
     monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
     monkeypatch.setattr(main_module, "load_config", lambda: config)
 
-    def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
+    def fetch_icals(urls: tuple[str, ...], *, debug: bool = False) -> tuple[FetchedIcal, ...]:
         called.append("fetch")
         assert urls == config.ical_urls
+        assert debug is config.debug_logs
         return fetched
 
     def parse_icals(
@@ -33,11 +34,13 @@ def test_main_runs_steps_in_order(monkeypatch) -> None:
         today,
         *,
         reference_now=None,
+        debug: bool = False,
     ) -> CalendarWindow:
         called.append("parse")
         assert calendars == fetched
         assert today == window.today.day
         assert reference_now == BATCH_START
+        assert debug is config.debug_logs
         return window
 
     def render_png(calendar: CalendarWindow) -> PngImage:
@@ -45,10 +48,11 @@ def test_main_runs_steps_in_order(monkeypatch) -> None:
         assert calendar == window
         return image
 
-    def send_dot_image(cfg, png: PngImage) -> DotSendResult:
+    def send_dot_image(cfg, png: PngImage, *, debug: bool = False) -> DotSendResult:
         called.append("send")
         assert cfg == config
         assert png == image
+        assert debug is config.debug_logs
         return DotSendResult(status_code=200, response_text="ok")
 
     monkeypatch.setattr(main_module, "fetch_icals", fetch_icals)
@@ -69,18 +73,19 @@ def test_main_passes_batch_start_before_fetch(monkeypatch) -> None:
     monkeypatch.setattr(
         main_module,
         "fetch_icals",
-        lambda _: (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),),
+        lambda _, **_kwargs: (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),),
     )
     monkeypatch.setattr(main_module, "render_png", lambda _: PngImage(content=b"png", width=296, height=152))
     monkeypatch.setattr(
         main_module,
         "send_dot_image",
-        lambda *_: DotSendResult(status_code=200, response_text="ok"),
+        lambda *_args, **_kwargs: DotSendResult(status_code=200, response_text="ok"),
     )
 
-    def parse_icals(_calendars, today, *, reference_now=None) -> CalendarWindow:
+    def parse_icals(_calendars, today, *, reference_now=None, debug: bool = False) -> CalendarWindow:
         captured["today"] = today
         captured["reference_now"] = reference_now
+        captured["debug"] = debug
         return make_empty_window()
 
     monkeypatch.setattr(main_module, "parse_icals", parse_icals)
@@ -89,6 +94,7 @@ def test_main_passes_batch_start_before_fetch(monkeypatch) -> None:
     assert captured == {
         "today": BATCH_START.date(),
         "reference_now": BATCH_START,
+        "debug": False,
     }
 
 
@@ -98,7 +104,7 @@ def test_main_returns_non_zero_and_stops_when_step_fails(monkeypatch, capsys) ->
     monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
     monkeypatch.setattr(main_module, "load_config", make_dot_config)
 
-    def fetch_icals(_: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
+    def fetch_icals(_: tuple[str, ...], **_kwargs) -> tuple[FetchedIcal, ...]:
         called.append("fetch")
         raise HandyCalendarError(f"iCal 取得失敗 url={ICS_URL_A}")
 
@@ -120,15 +126,51 @@ def test_main_returns_non_zero_when_dot_send_fails(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         main_module,
         "fetch_icals",
-        lambda _: (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),),
+        lambda _, **_kwargs: (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),),
     )
     monkeypatch.setattr(main_module, "parse_icals", lambda *_args, **_kwargs: window)
     monkeypatch.setattr(main_module, "render_png", lambda _: PngImage(content=b"png", width=296, height=152))
     monkeypatch.setattr(
         main_module,
         "send_dot_image",
-        lambda *_: (_ for _ in ()).throw(HandyCalendarError("Dot 送信失敗 code=400")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(HandyCalendarError("Dot 送信失敗 code=400")),
     )
 
     assert main_module.main() == 1
     assert "Dot 送信失敗 code=400" in capsys.readouterr().err
+
+
+def test_main_logs_each_stage_without_token(monkeypatch, capsys) -> None:
+    window = make_empty_window()
+    image = PngImage(content=b"png", width=296, height=152)
+
+    monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
+    monkeypatch.setattr(main_module, "load_config", make_dot_config)
+    monkeypatch.setattr(
+        main_module,
+        "fetch_icals",
+        lambda *_args, **_kwargs: (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),),
+    )
+    monkeypatch.setattr(main_module, "parse_icals", lambda *_args, **_kwargs: window)
+    monkeypatch.setattr(main_module, "render_png", lambda *_args, **_kwargs: image)
+    monkeypatch.setattr(
+        main_module,
+        "send_dot_image",
+        lambda *_args, **_kwargs: DotSendResult(status_code=200, response_text="ok"),
+    )
+
+    assert main_module.main() == 0
+
+    output = capsys.readouterr().out
+    for message in (
+        "iCal 取得開始",
+        "iCal 取得成功",
+        "iCal 解析開始",
+        "iCal 解析成功",
+        "PNG 生成開始",
+        "PNG 生成成功",
+        "Dot 送信開始",
+        "Dot 送信成功",
+    ):
+        assert message in output
+    assert "token" not in output

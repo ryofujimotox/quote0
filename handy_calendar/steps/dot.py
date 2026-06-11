@@ -16,10 +16,11 @@ API_BASE_URL = "https://dot.mindreset.tech"
 SEND_TIMEOUT_SECONDS = 20
 
 
-def send_dot_image(config: AppConfig, image: PngImage) -> DotSendResult:
+def send_dot_image(config: AppConfig, image: PngImage, *, debug: bool = False) -> DotSendResult:
     """PNGをDot Image APIへ送信し、成功応答だけを返す。"""
     _validate_image(image)
-    print(f"Dot 送信: device_id={config.dot_device_id}, bytes={len(image.content)}")
+    if debug:
+        print(f"Dot 送信詳細: device_id={config.dot_device_id}, bytes={len(image.content)}", flush=True)
     body = json.dumps(_request_body(image), separators=(",", ":")).encode("utf-8")
     request = Request(
         f"{API_BASE_URL}/api/authV2/open/device/{config.dot_device_id}/image",

@@ -350,3 +350,150 @@ def test_parse_icals_keeps_all_day_events_on_today_until_day_end() -> None:
     window = parse_icals((make_fetched_ical(ALL_DAY_TODAY_ICS),), REFERENCE_TODAY, reference_now=evening)
 
     assert tuple(event.uid for event in window.today.events) == ("all-day-today",)
+
+
+def test_fetch_icals_fails_with_url_when_charset_is_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
+    class BadCharsetResponse:
+        status = 200
+
+        def __init__(self) -> None:
+            from email.message import Message
+
+            self.headers = Message()
+            self.headers["Content-Type"] = "text/calendar; charset=x-unknown-calendar"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return EMPTY_ICS.encode("utf-8")
+
+    monkeypatch.setattr(ical_module, "urlopen", lambda *_args, **_kwargs: BadCharsetResponse())
+
+    with pytest.raises(HandyCalendarError, match=f"iCal 取得失敗 url={ICS_URL_A} reason=decode_failed"):
+        fetch_icals((ICS_URL_A,))
+
+
+def test_fetch_icals_fails_with_url_when_body_decode_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    class BadBodyResponse:
+        status = 200
+
+        def __init__(self) -> None:
+            from email.message import Message
+
+            self.headers = Message()
+            self.headers["Content-Type"] = "text/calendar; charset=utf-8"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"\xff\xfe\xff"
+
+    monkeypatch.setattr(ical_module, "urlopen", lambda *_args, **_kwargs: BadBodyResponse())
+
+    with pytest.raises(HandyCalendarError, match=f"iCal 取得失敗 url={ICS_URL_A} reason=decode_failed"):
+        fetch_icals((ICS_URL_A,))
+
+
+CANCELLED_SINGLE_ICS = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:cancelled
+STATUS:CANCELLED
+SUMMARY:キャンセル
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+BEGIN:VEVENT
+UID:active
+SUMMARY:有効
+DTSTART;TZID=Asia/Tokyo:20260529T120000
+DTEND;TZID=Asia/Tokyo:20260529T130000
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def test_parse_icals_skips_cancelled_single_event() -> None:
+    window = parse_icals((make_fetched_ical(CANCELLED_SINGLE_ICS),), REFERENCE_TODAY, reference_now=REFERENCE_NOW)
+
+    assert tuple(event.uid for event in window.today.events) == ("active",)
+
+
+CANCELLED_RECURRENCE_ICS = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:weekly-cancel
+SUMMARY:定例
+DTSTART;TZID=Asia/Tokyo:20260501T100000
+DTEND;TZID=Asia/Tokyo:20260501T110000
+RRULE:FREQ=WEEKLY;BYDAY=FR
+END:VEVENT
+BEGIN:VEVENT
+UID:weekly-cancel
+STATUS:CANCELLED
+SUMMARY:キャンセルされた回
+RECURRENCE-ID;TZID=Asia/Tokyo:20260529T100000
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def test_parse_icals_skips_cancelled_recurring_exception_and_original_occurrence() -> None:
+    window = parse_icals(
+        (make_fetched_ical(CANCELLED_RECURRENCE_ICS),),
+        REFERENCE_TODAY,
+        reference_now=REFERENCE_NOW,
+    )
+
+    assert window.today.events == ()
+
+
+NO_UID_SAME_TIME_ICS = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:同時刻A
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:同時刻B
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T113000
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def test_parse_icals_keeps_no_uid_events_at_same_start_time() -> None:
+    window = parse_icals((make_fetched_ical(NO_UID_SAME_TIME_ICS),), REFERENCE_TODAY, reference_now=REFERENCE_NOW)
+
+    assert tuple(event.title for event in window.today.events) == ("同時刻A", "同時刻B")
+
+
+def test_parse_icals_hides_event_details_without_debug(capsys: pytest.CaptureFixture[str]) -> None:
+    parse_icals((make_fetched_ical(MULTI_SOURCE_ICS_A),), REFERENCE_TODAY, reference_now=REFERENCE_NOW)
+
+    assert "同時刻A" not in capsys.readouterr().out
+
+
+def test_parse_icals_prints_event_details_with_debug(capsys: pytest.CaptureFixture[str]) -> None:
+    parse_icals(
+        (make_fetched_ical(MULTI_SOURCE_ICS_A, url=ICS_URL_A),),
+        REFERENCE_TODAY,
+        reference_now=REFERENCE_NOW,
+        debug=True,
+    )
+
+    output = capsys.readouterr().out
+    assert "同時刻A" in output
+    assert f"url={ICS_URL_A}" in output

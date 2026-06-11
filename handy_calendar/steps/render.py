@@ -111,6 +111,13 @@ class EventLine:
 
 
 @dataclass(frozen=True)
+class EmptyDayLine:
+    """予定がない日を明示する 1 行。"""
+
+    emphasized: bool
+
+
+@dataclass(frozen=True)
 class DayDividerLine:
     """1 枠目と 2 枠目の間の横線"""
 
@@ -133,7 +140,7 @@ class RenderFonts:
     regular: DayFonts
 
 
-RenderLine = DateHeaderLine | EventLine | DayDividerLine
+RenderLine = DateHeaderLine | EventLine | EmptyDayLine | DayDividerLine
 
 
 def build_display_days(calendar: CalendarWindow) -> tuple[DisplayDay, ...]:
@@ -175,10 +182,6 @@ def _display_event_from_calendar(event: CalendarEvent, display_day: date) -> Dis
 def render_png(calendar: CalendarWindow) -> PngImage:
     """CalendarWindow から PNG バイト列を作る。"""
     display_days = build_display_days(calendar)
-    print(
-        "PNG 生成: "
-        f"{display_days[0].day.isoformat()} / {display_days[1].day.isoformat()}"
-    )
     regular_path, bold_path = _resolve_font_paths()
     fonts = _load_fonts(regular_path, bold_path)
     lines = _build_lines(display_days)
@@ -204,9 +207,12 @@ def render_png(calendar: CalendarWindow) -> PngImage:
                 fill=ACCENT,
                 font=day_fonts.date,
             )
-        else:
+        elif isinstance(line, EventLine):
             day_fonts = _fonts_for_emphasis(fonts, line.emphasized)
             _draw_event_line(draw, y, line.display_event, day_fonts.events, event_left, event_width)
+        else:
+            day_fonts = _fonts_for_emphasis(fonts, line.emphasized)
+            draw.text((event_left, y), "予定なし", fill=INK, font=day_fonts.events.title)
         y += line_height
 
     output = BytesIO()
@@ -220,8 +226,11 @@ def _build_lines(display_days: tuple[DisplayDay, ...]) -> list[RenderLine]:
     for index, display_day in enumerate(display_days):
         emphasized = index == 0
         lines.append(DateHeaderLine(display_day.header, emphasized))
-        for display_event in display_day.events:
-            lines.append(EventLine(display_event, emphasized))
+        if display_day.events:
+            for display_event in display_day.events:
+                lines.append(EventLine(display_event, emphasized))
+        else:
+            lines.append(EmptyDayLine(emphasized))
         if index < len(display_days) - 1:
             lines.append(DayDividerLine())
     return lines

@@ -29,6 +29,7 @@ class AppConfig:
     ical_urls: tuple[str, ...]
     dot_api_token: str
     dot_device_id: str
+    debug_logs: bool = False
 
 
 def load_config(env_file: str | Path | None = None) -> AppConfig:
@@ -46,6 +47,7 @@ def load_config(env_file: str | Path | None = None) -> AppConfig:
     ical_urls_raw = os.getenv("ICAL_URLS", "")
     dot_api_token = os.getenv("DOT_API_TOKEN", "").strip()
     dot_device_id = os.getenv("DOT_DEVICE_ID", "").strip()
+    debug_logs = _is_truthy(os.getenv("HANDY_CALENDAR_DEBUG", ""))
 
     ical_urls = tuple(url.strip() for url in ical_urls_raw.split(",") if url.strip())
     if not ical_urls:
@@ -59,4 +61,10 @@ def load_config(env_file: str | Path | None = None) -> AppConfig:
         ical_urls=ical_urls,
         dot_api_token=dot_api_token,
         dot_device_id=dot_device_id,
+        debug_logs=debug_logs,
     )
+
+
+def _is_truthy(value: str) -> bool:
+    """デバッグ用の真偽値。1 / true / yes / on を有効扱いにする。"""
+    return value.strip().lower() in {"1", "true", "yes", "on"}
