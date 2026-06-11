@@ -16,12 +16,18 @@ class Device(BaseModel):
         model: Device model (e.g., 'quote_0')
         edition: Device edition (1 or 2)
         id: Device serial number
+        alias: Optional device alias
+        location: Optional device location
     """
 
     series: str = Field(description="Device series (e.g., 'quote')")
     model: str = Field(description="Device model (e.g., 'quote_0')")
     edition: int = Field(description="Device edition (1 or 2)")
     id: str = Field(description="Device serial number")
+    alias: Optional[str] = Field(default=None, description="Optional device alias")
+    location: Optional[str] = Field(
+        default=None, description="Optional device location"
+    )
 
 
 class BatteryStatus(BaseModel):
@@ -62,12 +68,15 @@ class CurrentRenderInfo(BaseModel):
     Attributes:
         rotated: Whether the display is rotated
         border: Border style (0 or 1)
-        image: List of render image URLs
+        image: List of render image URLs（未描画時は null または省略）
     """
 
     rotated: bool = Field(description="Whether the display is rotated")
     border: int = Field(description="Border style (0=white, 1=black)")
-    image: List[str] = Field(description="List of render image URLs")
+    image: Optional[List[str]] = Field(
+        default=None,
+        description="List of render image URLs (optional/null when no current image)",
+    )
 
 
 class NextRenderTime(BaseModel):

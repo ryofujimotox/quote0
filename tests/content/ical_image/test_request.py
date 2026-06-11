@@ -1,4 +1,4 @@
-"""custom/ical_image/request.py の単体テスト。"""
+"""ical_image/request.py の単体テスト。"""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ from datetime import date, datetime, timezone
 import pytest
 from quote0.vendor.quote0_client.exceptions import Quote0Error
 
-from quote0.custom.ical_image import CustomIcalImageContentRequest, png_to_image_content_request
-from quote0.custom.ical_image import request as request_module
-from quote0.custom.ical_image.ical import normalize_reference_now_jst, parse_icals
-from quote0.custom.ical_image.ical_models import FetchedIcal, JST, PngImage
+from quote0.content.ical_image import CustomIcalImageContentRequest, png_to_image_content_request
+from quote0.content.ical_image import request as request_module
+from quote0.content.ical_image.ical import normalize_reference_now_jst, parse_icals
+from quote0.content.ical_image.ical_models import FetchedIcal, JST, PngImage
 
-from tests.custom.ical_image.factories import ICS_URL_A, VALID_PNG, make_empty_window
+from tests.content.ical_image.factories import ICS_URL_A, VALID_PNG, make_empty_window
 
 BATCH_START = datetime(2026, 5, 29, 8, 0, tzinfo=JST)
 

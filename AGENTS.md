@@ -17,7 +17,7 @@
 
 - **OS・配置・cron・Python 導入**: [docs/deploy.md](docs/deploy.md) の「前提」と「Python 3.12 のインストール」
 - **言語は Python**: **Web フレームワークは使わない**。依存は必要最小限。**責務ごとにモジュール／ファイルを分ける**
-- **エントリポイント**: パッケージ `quote0`（`python -m quote0`）
+- **エントリポイント**: 本番は `quote0.commands.send_ical`（`python -m quote0.commands.send_ical`）。`python -m quote0` は `.env` と Dot 接続確認のみ
 - **実行環境**: **`.venv`** を使い実行する（版は `.python-version`）
 
 
@@ -116,7 +116,7 @@
 - テストランナーは `pytest` を使う
 - 単体テストは責務単位で分ける（**iCal 取得**、**iCal 解析**、**PNG 生成**）
 - `config.py` の `load_config` は必須環境変数不足で失敗し、原因が分かる日本語メッセージを返す
-- テストファイルは実行ファイル単位で分ける（例: `config.py` は `tests/test_config.py`、`custom/ical_image/ical.py` は `tests/custom/ical_image/test_ical.py`）
+- テストファイルは実行ファイル単位で分ける（例: `config.py` は `tests/test_config.py`、`content/ical_image/ical.py` は `tests/content/ical_image/test_ical.py`）
 - テスト関数は対象関数ごとに分ける（1 テスト関数 = 1 関数の 1 観点）
 - `iCal 取得` は複数 URL の全件成功時のみ成功とし、1 件でも失敗したら失敗にする
 - `iCal 解析` は上記「例」と「実装ルール」を満たす
@@ -142,7 +142,7 @@
 | 正本 | 内容 |
 |------|------|
 | 本書（AGENTS.md） | 要件・振る舞い・テスト観点 |
-| `quote0/` の **docstring・コメント** | 骨組みの意味・用語・例（半開区間・`main` / `custom` の役割など） |
+| `quote0/` の **docstring・コメント** | 骨組みの意味・用語・例（半開区間・`main` / `commands` / `content` の役割など） |
 
 - 骨組みの説明を直すときは **ソースだけ**直す（本書に同じ説明は書かない）
 
@@ -151,13 +151,17 @@
 
 | ファイル | 見る場所（説明の正本） |
 |----------|------------------------|
-| `main.py` | 起動入口・カスタムコンテンツの組み立てと Dot 送信（SDK） |
+| `main.py` | `.env` 検証と Dot API / デバイス接続確認（`python -m quote0`） |
+| `commands/send_ical/main.py` | バッチ本体（iCal → PNG → Dot 送信。`python -m quote0.commands.send_ical`） |
+| `commands/get_devices/main.py` | 登録済みデバイス一覧（`python -m quote0.commands.get_devices`） |
 | `config.py` | 必須環境変数 → `AppConfig` |
-| `custom/` | Quote/0 向けカスタムコンテンツ（種類ごとにサブパッケージ） |
-| `custom/ical_image/ical_models.py` | `DateRange`（半開区間の例）、`overlaps`、予定・日枠の型 |
-| `custom/ical_image/ical.py` | iCal 取得・解析、JST の日枠 |
-| `custom/ical_image/render.py` | PNG 生成 |
-| `custom/ical_image/request.py` | iCal → PNG → `ImageContentRequest` の拡張 |
+| `content/ical_image/` | iCal 取得・解析・PNG 生成・Dot リクエスト組み立て |
+| `content/ical_image/ical_models.py` | `DateRange`（半開区間の例）、`overlaps`、予定・日枠の型 |
+| `content/ical_image/ical.py` | iCal 取得・解析、JST の日枠 |
+| `content/ical_image/render.py` | PNG 生成 |
+| `content/ical_image/request.py` | iCal → PNG → `ImageContentRequest` の組み立て |
+| `content/jp_quote0_client.py` | Dot API クライアントの日本語エラー拡張 |
+| `vendor/` | Dot 送信用 SDK（vendored） |
 
 
 ### コメントの書き方

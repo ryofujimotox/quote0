@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from email.message import Message
 
 from quote0.config import AppConfig
-from quote0.custom.ical_image.ical_models import (
+from quote0.content.ical_image.ical_models import (
     CalendarEvent,
     CalendarWindow,
     DateRange,
@@ -16,8 +16,8 @@ from quote0.custom.ical_image.ical_models import (
     JST,
     PngImage,
 )
-from quote0.custom.ical_image.ical import day_range
-from quote0.custom.ical_image.render import DisplayDay, DisplayEvent, EVENT_LINE_WIDTH
+from quote0.content.ical_image.ical import day_range
+from quote0.content.ical_image.render import DisplayDay, DisplayEvent, EVENT_LINE_WIDTH
 
 # テスト全体で基準日を揃える（2026-05-29 = 金曜）
 REFERENCE_TODAY = date(2026, 5, 29)

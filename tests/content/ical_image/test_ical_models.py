@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from quote0.custom.ical_image.ical_models import JST, DateRange
+from quote0.content.ical_image.ical_models import JST, DateRange
 
 
 def test_date_range_rejects_naive_datetime() -> None:

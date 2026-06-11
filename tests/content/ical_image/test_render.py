@@ -12,9 +12,9 @@ import pytest
 from datetime import datetime
 
 from quote0.vendor.quote0_client.exceptions import Quote0Error
-from quote0.custom.ical_image.ical_models import JST
-from quote0.custom.ical_image.ical import parse_icals
-from quote0.custom.ical_image.render import (
+from quote0.content.ical_image.ical_models import JST
+from quote0.content.ical_image.ical import parse_icals
+from quote0.content.ical_image.render import (
     CANVAS_HEIGHT,
     CANVAS_WIDTH,
     DATE_FONT_PT,
@@ -37,7 +37,7 @@ from quote0.custom.ical_image.render import (
     render_png,
 )
 
-from tests.custom.ical_image.factories import (
+from tests.content.ical_image.factories import (
     REFERENCE_DAY_PLUS_3,
     REFERENCE_TODAY,
     REFERENCE_TOMORROW,
@@ -293,7 +293,7 @@ def test_render_png_outputs_fixed_canvas_size() -> None:
 
 
 def test_resolve_font_paths_raises_when_bundled_font_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    from quote0.custom.ical_image import render as render_module
+    from quote0.content.ical_image import render as render_module
 
     monkeypatch.setattr(render_module, "REGULAR_FONT_PATH", Path("/tmp/quote0-missing-font.ttf"))
 
