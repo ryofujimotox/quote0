@@ -7,6 +7,7 @@ import json
 import httpx
 
 from quote0.vendor.quote0_client.client import Quote0Client, _api_response_from_http
+from quote0.vendor.quote0_client.models import DeviceStatus
 
 
 def _fake_response(*, status: int, payload: object) -> httpx.Response:
@@ -28,6 +29,51 @@ def test_api_response_from_http_keeps_body_code() -> None:
 
     assert response.code == 400
     assert response.success is False
+
+
+def test_device_status_accepts_null_current_image() -> None:
+    """未描画デバイスは renderInfo.current.image が null でも接続確認に使える。"""
+    status = DeviceStatus.model_validate(
+        {
+            "deviceId": "device-1",
+            "status": {
+                "version": "1",
+                "current": "ok",
+                "description": "ok",
+                "battery": "ok",
+                "wifi": "ok",
+            },
+            "renderInfo": {
+                "last": "",
+                "current": {"rotated": False, "border": 0, "image": None},
+                "next": {"battery": "", "power": ""},
+            },
+        }
+    )
+
+    assert status.renderInfo.current.image is None
+
+
+def test_device_status_accepts_omitted_current_image() -> None:
+    status = DeviceStatus.model_validate(
+        {
+            "deviceId": "device-1",
+            "status": {
+                "version": "1",
+                "current": "ok",
+                "description": "ok",
+                "battery": "ok",
+                "wifi": "ok",
+            },
+            "renderInfo": {
+                "last": "",
+                "current": {"rotated": False, "border": 0},
+                "next": {"battery": "", "power": ""},
+            },
+        }
+    )
+
+    assert status.renderInfo.current.image is None
 
 
 def test_quote0_client_uses_legacy_timeout_and_user_agent() -> None:

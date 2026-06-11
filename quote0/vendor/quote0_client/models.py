@@ -68,12 +68,15 @@ class CurrentRenderInfo(BaseModel):
     Attributes:
         rotated: Whether the display is rotated
         border: Border style (0 or 1)
-        image: List of render image URLs
+        image: List of render image URLs（未描画時は null または省略）
     """
 
     rotated: bool = Field(description="Whether the display is rotated")
     border: int = Field(description="Border style (0=white, 1=black)")
-    image: List[str] = Field(description="List of render image URLs")
+    image: Optional[List[str]] = Field(
+        default=None,
+        description="List of render image URLs (optional/null when no current image)",
+    )
 
 
 class NextRenderTime(BaseModel):
