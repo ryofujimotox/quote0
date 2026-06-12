@@ -157,13 +157,14 @@ def _days_with_events_after(events: tuple[CalendarEvent, ...], first_date: date)
 
 
 def _component_dedup_key(calendar: FetchedIcal, component) -> tuple[object, ...]:
-    """展開側と walk の二重取り込み防止。UID 空は SUMMARY も含めて別予定とみなす。"""
+    """展開側と walk の二重取り込み防止。UID 空は SUMMARY・終了時刻も含めて別予定とみなす。"""
     uid = str(component.get("UID") or "")
     dtstart = component.decoded("DTSTART")
     if uid:
         return ("uid", uid, dtstart)
     summary = str(component.get("SUMMARY") or "")
-    return ("anon", calendar.source_index, dtstart, summary)
+    dtend = _decoded_end(component, dtstart)
+    return ("anon", calendar.source_index, dtstart, summary, dtend)
 
 
 def _decode_ics(content: bytes, headers: Message) -> str:

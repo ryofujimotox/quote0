@@ -464,6 +464,31 @@ END:VCALENDAR
     assert tuple(event.title for event in window.first_day.events) == ("予定A", "予定B")
 
 
+def test_parse_icals_keeps_distinct_empty_uid_events_with_same_summary_and_start() -> None:
+    empty_uid_same_title_ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:同じタイトル
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:同じタイトル
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T120000
+END:VEVENT
+END:VCALENDAR
+"""
+
+    window = parse_icals(
+        (make_fetched_ical(empty_uid_same_title_ics),),
+        reference_now=REFERENCE_NOW,
+    )
+
+    assert len(window.first_day.events) == 2
+    assert tuple(event.period.end.hour for event in window.first_day.events) == (11, 12)
+
+
 def test_parse_icals_omits_event_titles_from_stdout_by_default(capsys) -> None:
     today_only_ics = """BEGIN:VCALENDAR
 VERSION:2.0
