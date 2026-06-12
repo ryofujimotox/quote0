@@ -96,6 +96,7 @@ tests/                  # 単体テスト（quote0/ と同じ階層）
 AGENTS.md               # 要件・振る舞い（仕様の正本）
 docs/deploy.md          # Linux 配置・cron
 docs/git.md             # Git 運用
+docs/issue-parallel-plan.md  # Issue 並行解決プラン（テンプレート）
 .env.example            # 環境変数名テンプレ
 LICENSE                 # 本体（MIT）
 quote0/content/ical_image/fonts/LICENSE   # フォント（OFL）
