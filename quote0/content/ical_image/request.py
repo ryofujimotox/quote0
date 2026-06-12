@@ -29,23 +29,13 @@ class CustomIcalImageContentRequest:
 
     ical_urls: tuple[str, ...]
     reference_now: datetime | None = None
+    debug: bool = False
 
     def to_image_content_request(self) -> ImageContentRequest:
         reference_now = self.reference_now if self.reference_now is not None else datetime.now(JST)
         calendars = fetch_icals(self.ical_urls)
-        print(f"iCal 取得完了: {len(calendars)}件", flush=True)
-        calendar = parse_icals(calendars, reference_now=reference_now)
-        print(
-            "iCal 解析完了: "
-            f"first_day={len(calendar.first_day.events)}件, "
-            f"next_day={calendar.next_day.date.isoformat()}({len(calendar.next_day.events)}件)",
-            flush=True,
-        )
+        calendar = parse_icals(calendars, reference_now=reference_now, debug=self.debug)
         image = render_png(calendar)
-        print(
-            f"PNG 生成完了: {image.width}x{image.height}, bytes={len(image.content)}",
-            flush=True,
-        )
         return png_to_image_content_request(image)
 
 
