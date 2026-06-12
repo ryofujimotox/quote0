@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from email.message import Message
 from urllib.error import HTTPError
 
 import pytest
@@ -337,6 +338,130 @@ DTEND;VALUE=DATE:20260530
 END:VEVENT
 END:VCALENDAR
 """
+
+
+def test_fetch_icals_fails_on_unicode_decode_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    class BadBytesResponse:
+        status = 200
+
+        def __init__(self) -> None:
+            self.headers = Message()
+            self.headers["Content-Type"] = "text/calendar; charset=utf-8"
+
+        def read(self) -> bytes:
+            return b"\xff\xfe\xfd"
+
+        def __enter__(self) -> BadBytesResponse:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    def urlopen(request, timeout: int):
+        return BadBytesResponse()
+
+    monkeypatch.setattr(ical_module, "urlopen", urlopen)
+
+    with pytest.raises(
+        Quote0Error,
+        match=f"iCal 取得失敗 url={ICS_URL_A} reason=decode_failed charset=utf-8",
+    ):
+        fetch_icals((ICS_URL_A,))
+
+
+def test_fetch_icals_fails_on_unknown_charset(monkeypatch: pytest.MonkeyPatch) -> None:
+    class UnknownCharsetResponse:
+        status = 200
+
+        def __init__(self) -> None:
+            self.headers = Message()
+            self.headers["Content-Type"] = "text/calendar; charset=x-unknown-999"
+
+        def read(self) -> bytes:
+            return EMPTY_ICS.encode("utf-8")
+
+        def __enter__(self) -> UnknownCharsetResponse:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    def urlopen(request, timeout: int):
+        return UnknownCharsetResponse()
+
+    monkeypatch.setattr(ical_module, "urlopen", urlopen)
+
+    with pytest.raises(
+        Quote0Error,
+        match=f"iCal 取得失敗 url={ICS_URL_A} reason=decode_failed charset=x-unknown-999",
+    ):
+        fetch_icals((ICS_URL_A,))
+
+
+def test_parse_icals_omits_cancelled_single_event() -> None:
+    cancelled_ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:cancelled-one
+SUMMARY:キャンセル済み
+STATUS:CANCELLED
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
+    window = parse_icals((make_fetched_ical(cancelled_ics),), reference_now=REFERENCE_NOW)
+
+    assert window.first_day.events == ()
+    assert window.next_day.events == ()
+
+
+def test_parse_icals_omits_cancelled_recurrence_exception() -> None:
+    cancelled_exception_ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:series
+SUMMARY:定例
+DTSTART;TZID=Asia/Tokyo:20260501T100000
+DTEND;TZID=Asia/Tokyo:20260501T110000
+RRULE:FREQ=WEEKLY;BYDAY=FR
+END:VEVENT
+BEGIN:VEVENT
+UID:series
+SUMMARY:キャンセルされた回
+STATUS:CANCELLED
+RECURRENCE-ID;TZID=Asia/Tokyo:20260529T100000
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
+    window = parse_icals((make_fetched_ical(cancelled_exception_ics),), reference_now=REFERENCE_NOW)
+
+    assert window.first_day.events == ()
+
+
+def test_parse_icals_keeps_distinct_events_with_empty_uid_and_same_start() -> None:
+    empty_uid_ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:予定A
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:予定B
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
+    window = parse_icals((make_fetched_ical(empty_uid_ics),), reference_now=REFERENCE_NOW)
+
+    assert tuple(event.title for event in window.first_day.events) == ("予定A", "予定B")
 
 
 def test_parse_icals_omits_event_titles_from_stdout_by_default(capsys) -> None:
