@@ -84,7 +84,14 @@ crontab -e
 ```
 
 ```cron
-0 0 * * * cd /home/scripts/quote0 && .venv/bin/python -m quote0.commands.send_ical
+0 0 * * * cd /home/scripts/quote0 && .venv/bin/python -m quote0.commands.send_ical >>/var/log/quote0/send_ical.log 2>&1
+```
+
+初回はログ用ディレクトリを作成する。
+
+```bash
+sudo mkdir -p /var/log/quote0
+sudo chown "$(whoami)" /var/log/quote0
 ```
 
 `crontab -l` で登録内容を確認する。
@@ -95,6 +102,7 @@ crontab -l
 
 - 上記 1 行が表示されれば OK
 
+cron 実行後は `/var/log/quote0/send_ical.log` に stdout / stderr が追記される。失敗時は終了コードとログ末尾の段名付きメッセージを確認する（`DOT_API_TOKEN` 等の秘密値はログに出ない）。
 
 
 ## 更新
