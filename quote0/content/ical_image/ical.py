@@ -61,13 +61,7 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
                 if status < 200 or status >= 300:
                     raise Quote0Error(f"iCal 取得失敗 url={url} status={status}")
                 content = response.read()
-                try:
-                    text = _decode_ics(content, response.headers)
-                except (LookupError, UnicodeDecodeError) as exc:
-                    charset = response.headers.get_content_charset() or "utf-8"
-                    raise Quote0Error(
-                        f"iCal 取得失敗 url={url} reason=decode_failed charset={charset}"
-                    ) from exc
+                text = _decode_ics(content, response.headers)
                 log_info(f"iCal 取得詳細: source={index}, bytes={len(content)}")
                 fetched.append(FetchedIcal(source_index=index, url=url, text=text))
         except HTTPError as exc:
@@ -156,16 +150,6 @@ def _days_with_events_after(events: tuple[CalendarEvent, ...], first_date: date)
     return tuple(sorted(days))
 
 
-def _component_dedup_key(calendar: FetchedIcal, component) -> tuple[object, ...]:
-    """展開側と walk の二重取り込み防止。UID 空は SUMMARY も含めて別予定とみなす。"""
-    uid = str(component.get("UID") or "")
-    dtstart = component.decoded("DTSTART")
-    if uid:
-        return ("uid", uid, dtstart)
-    summary = str(component.get("SUMMARY") or "")
-    return ("anon", calendar.source_index, dtstart, summary)
-
-
 def _decode_ics(content: bytes, headers: Message) -> str:
     """HTTPヘッダーの charset があれば使い、なければ UTF-8 として読む。"""
     charset = headers.get_content_charset() or "utf-8"
@@ -186,14 +170,14 @@ def _parse_calendar_events(calendar: FetchedIcal, first_date: date) -> tuple[Cal
     )
     try:
         events: list[CalendarEvent] = []
-        seen: set[tuple[object, ...]] = set()
+        seen: set[tuple[str, date | datetime]] = set()
 
         def add_component(component) -> None:
             if component.get("DTSTART") is None:
                 return
-            if str(component.get("STATUS", "")).upper() == "CANCELLED":
-                return
-            key = _component_dedup_key(calendar, component)
+            uid = str(component.get("UID") or "")
+            dtstart = component.decoded("DTSTART")
+            key = (uid, dtstart)
             if key in seen:
                 return
             seen.add(key)
