@@ -16,6 +16,8 @@
 - レビュー依頼（初回）：PR コメントに **@codex review**
 - 再レビュー依頼（指摘対応後）：PR コメントに **@codex review** を再度付ける
 - Issue 自動クローズ：PR **説明**に `Fixes #N` を書き **dev へマージ**する
+- 原則、1 Issue につきブランチ 1 本・PR 1 つ。小さな Issue（例: 文言修正のみ）は複数を 1 PR にまとめてよい
+- 複数 Issue を並行で進めるとき: [issue-parallel-plan.md](issue-parallel-plan.md) のテンプレートを `plan.md` にコピーして整理する
 
 
 
