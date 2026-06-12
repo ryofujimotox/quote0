@@ -54,3 +54,15 @@ def test_load_config_splits_ical_urls_in_order(monkeypatch: pytest.MonkeyPatch, 
     assert config.ical_urls == ("https://example.com/a.ics", "https://example.com/b.ics")
     assert config.dot_api_token == "token"
     assert config.dot_device_id == "device"
+
+
+def test_load_config_reads_debug_log_flag(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    clear_required_env(monkeypatch)
+    monkeypatch.setenv("ICAL_URLS", "https://example.com/a.ics")
+    monkeypatch.setenv("DOT_API_TOKEN", "token")
+    monkeypatch.setenv("DOT_DEVICE_ID", "device")
+    monkeypatch.setenv("QUOTE0_DEBUG_LOGS", "1")
+
+    config = load_config(tmp_path / ".env")
+
+    assert config.debug_logs is True

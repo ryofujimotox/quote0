@@ -40,16 +40,19 @@ def test_custom_ical_image_content_request_builds_image_request(monkeypatch: pyt
     image = VALID_PNG
     captured: dict[str, object] = {}
 
-    def fake_fetch(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
+    def fake_fetch(urls: tuple[str, ...], *, debug_logs: bool = False) -> tuple[FetchedIcal, ...]:
         captured["urls"] = urls
+        captured["fetch_debug_logs"] = debug_logs
         return fetched
 
-    def fake_parse(calendars, *, reference_now=None):
+    def fake_parse(calendars, *, reference_now=None, debug_logs: bool = False):
         captured["reference_now"] = reference_now
+        captured["parse_debug_logs"] = debug_logs
         return window
 
-    def fake_render(calendar) -> PngImage:
+    def fake_render(calendar, *, debug_logs: bool = False) -> PngImage:
         captured["calendar"] = calendar
+        captured["render_debug_logs"] = debug_logs
         return image
 
     monkeypatch.setattr(request_module, "fetch_icals", fake_fetch)
@@ -64,6 +67,9 @@ def test_custom_ical_image_content_request_builds_image_request(monkeypatch: pyt
     assert captured["urls"] == (ICS_URL_A,)
     assert captured["reference_now"] == BATCH_START
     assert captured["calendar"] == window
+    assert captured["fetch_debug_logs"] is False
+    assert captured["parse_debug_logs"] is False
+    assert captured["render_debug_logs"] is False
     assert request.image == base64.b64encode(image.content).decode("ascii")
 
 

@@ -44,6 +44,8 @@ chmod 600 .env
 
 [AGENTS.md](../AGENTS.md) の「設定（環境変数）」どおり `.env` を設定する。
 
+通常実行のログには予定タイトルや URL の詳細は出さない。原因調査で詳細が必要なときだけ、`.env` の `QUOTE0_DEBUG_LOGS=1` にして手動実行する。調査後は `QUOTE0_DEBUG_LOGS=0` に戻す。
+
 
 
 ### 動作確認

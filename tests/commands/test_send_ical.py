@@ -201,3 +201,35 @@ def test_send_ical_returns_non_zero_when_dot_auth_fails(monkeypatch, capsys) -> 
 
     assert send_ical_main.main() == 1
     assert "Dot 送信失敗: API キーが無効です" in capsys.readouterr().err
+
+
+def test_send_ical_outputs_stage_success_logs_without_token(monkeypatch, capsys) -> None:
+    config = make_dot_config()
+
+    monkeypatch.setattr(send_ical_main, "_batch_start_now", lambda: BATCH_START)
+    monkeypatch.setattr(send_ical_main, "load_config", lambda: config)
+    monkeypatch.setattr(
+        CustomIcalImageContentRequest,
+        "to_image_content_request",
+        lambda _self: DOT_IMAGE_REQUEST,
+    )
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            pass
+
+        def send_image(self, device_id: str, content: ImageContentRequest) -> APIResponse:
+            return APIResponse(code=200, message="ok")
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(send_ical_main, "Quote0Client", FakeClient)
+
+    assert send_ical_main.main() == 0
+    output = capsys.readouterr()
+    assert "Dot送信開始" in output.out
+    assert "Dot送信成功" in output.out
+    assert "バッチ成功" in output.out
+    assert config.dot_api_token not in output.out
+    assert config.dot_api_token not in output.err

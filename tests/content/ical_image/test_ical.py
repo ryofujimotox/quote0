@@ -345,3 +345,31 @@ def test_parse_icals_keeps_all_day_events_on_today_until_day_end() -> None:
     window = parse_icals((make_fetched_ical(ALL_DAY_TODAY_ICS),), reference_now=evening)
 
     assert tuple(event.uid for event in window.first_day.events) == ("all-day-today",)
+
+
+DEBUG_LOG_ICS = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:debug-log
+SUMMARY:デバッグだけに出す予定
+DTSTART;TZID=Asia/Tokyo:20260529T110000
+DTEND;TZID=Asia/Tokyo:20260529T120000
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def test_parse_icals_hides_event_titles_without_debug_logs(capsys: pytest.CaptureFixture[str]) -> None:
+    parse_icals((make_fetched_ical(DEBUG_LOG_ICS),), reference_now=REFERENCE_NOW)
+
+    assert "デバッグだけに出す予定" not in capsys.readouterr().out
+
+
+def test_parse_icals_outputs_event_titles_with_debug_logs(capsys: pytest.CaptureFixture[str]) -> None:
+    parse_icals(
+        (make_fetched_ical(DEBUG_LOG_ICS),),
+        reference_now=REFERENCE_NOW,
+        debug_logs=True,
+    )
+
+    assert "デバッグだけに出す予定" in capsys.readouterr().out

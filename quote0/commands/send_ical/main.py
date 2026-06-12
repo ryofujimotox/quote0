@@ -37,27 +37,32 @@ def main() -> int:
         content = CustomIcalImageContentRequest(
             ical_urls=ical_urls,
             reference_now=reference_now,
+            debug_logs=config.debug_logs,
         ).to_image_content_request()
-        print(
-            f"Dot 送信: device_id={dot_device_id}, bytes={len(content.image)}",
-            flush=True,
-        )
 
         # Dot API を使用して画像を送信
-        client = Quote0Client(api_key=dot_api_token)
-        client.send_image(dot_device_id, content)
+        print(
+            f"Dot送信開始: device_id={dot_device_id}, bytes={len(content.image)}",
+            flush=True,
+        )
+        try:
+            client = Quote0Client(api_key=dot_api_token)
+            client.send_image(dot_device_id, content)
+        except Exception as exc:
+            raise Quote0Error(f"Dot送信失敗: {exc}") from exc
+        print(f"Dot送信成功: device_id={dot_device_id}", flush=True)
     except Quote0Error as exc:
-        log_error(f"起動失敗: {exc}")
+        log_error(f"バッチ失敗: {exc}")
         return 1
     except Exception as exc:
-        log_error(f"起動失敗: 想定外のエラーです: {exc}")
+        log_error(f"バッチ失敗: 想定外のエラーです: {exc}")
         return 1
     finally:
         if client is not None:
             client.close()
 
     print(
-        "バッチ完了: iCal取得→解析→PNG→Dot送信 "
+        "バッチ成功: iCal取得→解析→PNG生成→Dot送信 "
         f"(ical_urls={len(ical_urls)}件, device_id={dot_device_id})",
         flush=True,
     )

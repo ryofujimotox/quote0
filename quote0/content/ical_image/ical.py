@@ -43,14 +43,13 @@ def day_range(day: date) -> DateRange:
     return DateRange(start=start, end=start + timedelta(days=1))
 
 
-def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
+def fetch_icals(urls: tuple[str, ...], *, debug_logs: bool = False) -> tuple[FetchedIcal, ...]:
     """公開 ICS URL を URL 列挙順で全件取得する。
 
     例: ("https://cal.example/a.ics", "https://cal.example/b.ics")
         → (FetchedIcal(0, "https://cal.example/a.ics", "BEGIN:VCALENDAR…"),
            FetchedIcal(1, "https://cal.example/b.ics", "BEGIN:VCALENDAR…"))
     """
-    print(f"iCal 取得: {len(urls)}件", flush=True)
     fetched: list[FetchedIcal] = []
     for index, url in enumerate(urls):
         request = Request(url, headers={"User-Agent": "quote0/0"})
@@ -61,7 +60,11 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
                     raise Quote0Error(f"iCal 取得失敗 url={url} status={status}")
                 content = response.read()
                 text = _decode_ics(content, response.headers)
-                print(f"iCal 取得詳細: source={index}, bytes={len(content)}", flush=True)
+                if debug_logs:
+                    print(
+                        f"iCal 取得詳細: source={index}, url={url}, bytes={len(content)}",
+                        flush=True,
+                    )
                 fetched.append(FetchedIcal(source_index=index, url=url, text=text))
         except HTTPError as exc:
             raise Quote0Error(f"iCal 取得失敗 url={url} status={exc.code}") from exc
@@ -76,6 +79,7 @@ def parse_icals(
     calendars: tuple[FetchedIcal, ...],
     *,
     reference_now: datetime | None = None,
+    debug_logs: bool = False,
 ) -> CalendarWindow:
     """取得済み ICS から今日・次の予定日の予定を抽出する。
 
@@ -93,21 +97,21 @@ def parse_icals(
     reference_now = normalize_reference_now_jst(reference_now)
     first_date = reference_now.date()
     first_period = day_range(first_date)
-    print(f"iCal 解析: {len(calendars)}件", flush=True)
     events = _sorted_events(
         event
         for calendar in calendars
         for event in _parse_calendar_events(calendar, first_date)
     )
-    print(f"iCal 解析詳細: total_events={len(events)}", flush=True)
-    for event in events:
-        print(
-            "iCal 予定: "
-            f"source={event.source_index}, uid={event.uid}, title={event.title}, "
-            f"start={event.period.start.isoformat()}, end={event.period.end.isoformat()}, "
-            f"all_day={event.all_day}",
-            flush=True,
-        )
+    if debug_logs:
+        print(f"iCal 解析詳細: total_events={len(events)}", flush=True)
+        for event in events:
+            print(
+                "iCal 予定: "
+                f"source={event.source_index}, uid={event.uid}, title={event.title}, "
+                f"start={event.period.start.isoformat()}, end={event.period.end.isoformat()}, "
+                f"all_day={event.all_day}",
+                flush=True,
+            )
     next_date = _find_next_event_day(events, first_date)
     next_period = day_range(next_date)
     # 今日枠は overlap（前日開始の進行中も載せる）。2枠目は開始日のみ（日跨ぎの二重表示を避ける）

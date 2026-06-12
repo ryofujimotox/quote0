@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import base64
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TypeVar
 
 from quote0.vendor.quote0_client.exceptions import Quote0Error
 from quote0.vendor.quote0_client.models import ImageContentRequest
@@ -12,6 +14,9 @@ from quote0.vendor.quote0_client.models import ImageContentRequest
 from .ical import fetch_icals, parse_icals
 from .ical_models import JST, PngImage
 from .render import render_png
+
+
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
@@ -29,24 +34,41 @@ class CustomIcalImageContentRequest:
 
     ical_urls: tuple[str, ...]
     reference_now: datetime | None = None
+    debug_logs: bool = False
 
     def to_image_content_request(self) -> ImageContentRequest:
         reference_now = self.reference_now if self.reference_now is not None else datetime.now(JST)
-        calendars = fetch_icals(self.ical_urls)
-        print(f"iCal 取得完了: {len(calendars)}件", flush=True)
-        calendar = parse_icals(calendars, reference_now=reference_now)
-        print(
-            "iCal 解析完了: "
-            f"first_day={len(calendar.first_day.events)}件, "
-            f"next_day={calendar.next_day.date.isoformat()}({len(calendar.next_day.events)}件)",
-            flush=True,
+
+        calendars = _run_stage(
+            "iCal取得",
+            lambda: fetch_icals(self.ical_urls, debug_logs=self.debug_logs),
+            lambda result: f"{len(result)}件",
         )
-        image = render_png(calendar)
-        print(
-            f"PNG 生成完了: {image.width}x{image.height}, bytes={len(image.content)}",
-            flush=True,
+        calendar = _run_stage(
+            "解析",
+            lambda: parse_icals(calendars, reference_now=reference_now, debug_logs=self.debug_logs),
+            lambda result: (
+                f"first_day={len(result.first_day.events)}件, "
+                f"next_day={result.next_day.date.isoformat()}({len(result.next_day.events)}件)"
+            ),
+        )
+        image = _run_stage(
+            "PNG生成",
+            lambda: render_png(calendar, debug_logs=self.debug_logs),
+            lambda result: f"{result.width}x{result.height}, bytes={len(result.content)}",
         )
         return png_to_image_content_request(image)
+
+
+def _run_stage(stage: str, action: Callable[[], T], summary: Callable[[T], str]) -> T:
+    """段階ごとの開始・成功・失敗を同じ形式で残す。"""
+    print(f"{stage}開始", flush=True)
+    try:
+        result = action()
+    except Exception as exc:
+        raise Quote0Error(f"{stage}失敗: {exc}") from exc
+    print(f"{stage}成功: {summary(result)}", flush=True)
+    return result
 
 
 def png_to_image_content_request(image: PngImage) -> ImageContentRequest:

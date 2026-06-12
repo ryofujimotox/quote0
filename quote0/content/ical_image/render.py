@@ -172,13 +172,15 @@ def _display_event_from_calendar(event: CalendarEvent, display_date: date) -> Di
     )
 
 
-def render_png(calendar: CalendarWindow) -> PngImage:
+def render_png(calendar: CalendarWindow, *, debug_logs: bool = False) -> PngImage:
     """CalendarWindow から PNG バイト列を作る。"""
     display_days = build_display_days(calendar)
-    print(
-        "PNG 生成: "
-        f"{display_days[0].date.isoformat()} / {display_days[1].date.isoformat()}"
-    )
+    if debug_logs:
+        print(
+            "PNG 生成詳細: "
+            f"{display_days[0].date.isoformat()} / {display_days[1].date.isoformat()}",
+            flush=True,
+        )
     regular_path, bold_path = _resolve_font_paths()
     fonts = _load_fonts(regular_path, bold_path)
     lines = _build_lines(display_days)
