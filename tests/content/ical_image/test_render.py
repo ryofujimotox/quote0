@@ -94,6 +94,13 @@ def test_build_display_days_omits_time_suffix_for_all_day_event() -> None:
     )
 
 
+def test_build_display_days_shows_no_events_line_for_empty_days() -> None:
+    today_block, next_block = build_display_days(make_empty_window())
+
+    assert today_block.events[0].event.title == "予定なし"
+    assert next_block.events[0].event.title == "予定なし"
+
+
 def test_build_display_days_leaves_empty_days_without_events() -> None:
     assert build_display_days(make_empty_window()) == (
         empty_today_display_day(),
@@ -208,6 +215,19 @@ def test_build_lines_interleaves_headers_events_and_divider() -> None:
         DateHeaderLine("明日（5/30土）", emphasized=False),
         EventLine(next_day_block.events[0], emphasized=False),
     ]
+
+
+def test_build_lines_shows_no_events_for_empty_days() -> None:
+    lines = _build_lines(build_display_days(make_empty_window()))
+
+    assert [type(line) for line in lines] == [
+        DateHeaderLine,
+        EventLine,
+        DayDividerLine,
+        DateHeaderLine,
+        EventLine,
+    ]
+    assert all(isinstance(line, EventLine) and line.display_event.event.title == "予定なし" for line in lines if isinstance(line, EventLine))
 
 
 def test_fit_title_and_time_keeps_short_title_and_full_time(render_fonts) -> None:

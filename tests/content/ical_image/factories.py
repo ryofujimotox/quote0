@@ -155,8 +155,18 @@ def all_day_display(event: CalendarEvent) -> DisplayEvent:
     return DisplayEvent(event=event, time_suffix=None)
 
 
+def no_events_display() -> DisplayEvent:
+    from quote0.content.ical_image.render import _no_events_display_event
+
+    return _no_events_display_event()
+
+
 def empty_today_display_day() -> DisplayDay:
-    return display_day(date=REFERENCE_TODAY, header="今日（5/29金）")
+    return display_day(
+        date=REFERENCE_TODAY,
+        header="今日（5/29金）",
+        events=(no_events_display(),),
+    )
 
 
 def empty_next_day_display_day(
@@ -164,7 +174,7 @@ def empty_next_day_display_day(
     date: date = REFERENCE_TOMORROW,
     header: str = "明日（5/30土）",
 ) -> DisplayDay:
-    return display_day(date=date, header=header)
+    return display_day(date=date, header=header, events=(no_events_display(),))
 
 
 def assert_window_event_uids(

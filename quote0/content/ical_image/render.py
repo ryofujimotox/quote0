@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 
@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from quote0.pipeline_log import log_stage_start, log_stage_success
 from quote0.vendor.quote0_client.exceptions import Quote0Error
-from .ical_models import CalendarEvent, CalendarWindow, DaySchedule, JST, PngImage
+from .ical_models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, JST, PngImage
 
 
 @dataclass(frozen=True)
@@ -153,12 +153,33 @@ def build_display_days(calendar: CalendarWindow) -> tuple[DisplayDay, ...]:
     )
 
 
+_NO_EVENTS_TITLE = "予定なし"
+
+
 def _display_day_from_schedule(schedule: DaySchedule, first_date: date) -> DisplayDay:
+    if schedule.events:
+        events = tuple(_display_event_from_calendar(event, schedule.date) for event in schedule.events)
+    else:
+        events = (_no_events_display_event(),)
     return DisplayDay(
         date=schedule.date,
         header=_format_date_header(schedule.date, first_date),
-        events=tuple(_display_event_from_calendar(event, schedule.date) for event in schedule.events),
+        events=events,
     )
+
+
+def _no_events_display_event() -> DisplayEvent:
+    """予定 0 件の日に描くプレースホルダ行（解析結果には含まれない）。"""
+    start = datetime(1970, 1, 1, tzinfo=JST)
+    placeholder = CalendarEvent(
+        uid="__no_events__",
+        title=_NO_EVENTS_TITLE,
+        period=DateRange(start=start, end=start + timedelta(minutes=1)),
+        source_index=-1,
+        source_url="",
+        all_day=True,
+    )
+    return DisplayEvent(event=placeholder, time_suffix=None)
 
 
 def _display_event_from_calendar(event: CalendarEvent, display_date: date) -> DisplayEvent:
