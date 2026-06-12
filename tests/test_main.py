@@ -2,133 +2,65 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from quote0 import main as main_module
+from quote0.vendor.quote0_client.exceptions import Quote0Error
+from quote0.vendor.quote0_client.models import DeviceStatus
 
-from handy_calendar.errors import HandyCalendarError
-from handy_calendar import main as main_module
-from handy_calendar.models import CalendarWindow, DotSendResult, FetchedIcal, JST, PngImage
-
-from tests.factories import ICS_URL_A, make_dot_config, make_empty_window
-
-BATCH_START = datetime(2026, 5, 29, 8, 0, tzinfo=JST)
+from tests.content.ical_image.factories import make_dot_config
 
 
-def test_main_runs_steps_in_order(monkeypatch) -> None:
-    called: list[str] = []
-    fetched = (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),)
-    window = make_empty_window()
-    image = PngImage(content=b"png", width=1, height=1)
+def test_main_returns_zero_when_dot_connection_ok(monkeypatch) -> None:
     config = make_dot_config()
+    called: list[str] = []
 
-    monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
     monkeypatch.setattr(main_module, "load_config", lambda: config)
 
-    def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
-        called.append("fetch")
-        assert urls == config.ical_urls
-        return fetched
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            assert api_key == config.dot_api_token
 
-    def parse_icals(
-        calendars: tuple[FetchedIcal, ...],
-        today,
-        *,
-        reference_now=None,
-    ) -> CalendarWindow:
-        called.append("parse")
-        assert calendars == fetched
-        assert today == window.today.day
-        assert reference_now == BATCH_START
-        return window
+        def get_device_status(self, device_id: str) -> DeviceStatus:
+            called.append("get_device_status")
+            assert device_id == config.dot_device_id
+            return DeviceStatus(
+                deviceId=device_id,
+                status={
+                    "version": "1",
+                    "current": "ok",
+                    "description": "ok",
+                    "battery": "ok",
+                    "wifi": "ok",
+                },
+                renderInfo={
+                    "last": "",
+                    "current": {"rotated": False, "border": 0, "image": []},
+                    "next": {"battery": "", "power": ""},
+                },
+            )
 
-    def render_png(calendar: CalendarWindow) -> PngImage:
-        called.append("render")
-        assert calendar == window
-        return image
+        def close(self) -> None:
+            called.append("close")
 
-    def send_dot_image(cfg, png: PngImage) -> DotSendResult:
-        called.append("send")
-        assert cfg == config
-        assert png == image
-        return DotSendResult(status_code=200, response_text="ok")
-
-    monkeypatch.setattr(main_module, "fetch_icals", fetch_icals)
-    monkeypatch.setattr(main_module, "parse_icals", parse_icals)
-    monkeypatch.setattr(main_module, "render_png", render_png)
-    monkeypatch.setattr(main_module, "send_dot_image", send_dot_image)
+    monkeypatch.setattr(main_module, "Quote0Client", FakeClient)
 
     assert main_module.main() == 0
-    assert called == ["fetch", "parse", "render", "send"]
+    assert called == ["get_device_status", "close"]
 
 
-def test_main_passes_batch_start_before_fetch(monkeypatch) -> None:
-    """取得前に固定した started_at を today と reference_now の両方に使う。"""
-    captured: dict[str, object] = {}
-
-    monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
-    monkeypatch.setattr(main_module, "load_config", make_dot_config)
-    monkeypatch.setattr(
-        main_module,
-        "fetch_icals",
-        lambda _: (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),),
-    )
-    monkeypatch.setattr(main_module, "render_png", lambda _: PngImage(content=b"png", width=296, height=152))
-    monkeypatch.setattr(
-        main_module,
-        "send_dot_image",
-        lambda *_: DotSendResult(status_code=200, response_text="ok"),
-    )
-
-    def parse_icals(_calendars, today, *, reference_now=None) -> CalendarWindow:
-        captured["today"] = today
-        captured["reference_now"] = reference_now
-        return make_empty_window()
-
-    monkeypatch.setattr(main_module, "parse_icals", parse_icals)
-
-    assert main_module.main() == 0
-    assert captured == {
-        "today": BATCH_START.date(),
-        "reference_now": BATCH_START,
-    }
-
-
-def test_main_returns_non_zero_and_stops_when_step_fails(monkeypatch, capsys) -> None:
-    called: list[str] = []
-
-    monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
+def test_main_returns_one_when_dot_status_fails(monkeypatch, capsys) -> None:
     monkeypatch.setattr(main_module, "load_config", make_dot_config)
 
-    def fetch_icals(_: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
-        called.append("fetch")
-        raise HandyCalendarError(f"iCal 取得失敗 url={ICS_URL_A}")
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            pass
 
-    monkeypatch.setattr(main_module, "fetch_icals", fetch_icals)
-    monkeypatch.setattr(main_module, "parse_icals", lambda *_: called.append("parse"))
-    monkeypatch.setattr(main_module, "render_png", lambda *_: called.append("render"))
-    monkeypatch.setattr(main_module, "send_dot_image", lambda *_: called.append("send"))
+        def get_device_status(self, device_id: str) -> DeviceStatus:
+            raise Quote0Error("Dot 送信失敗: デバイスが見つかりません")
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(main_module, "Quote0Client", FakeClient)
 
     assert main_module.main() == 1
-    assert called == ["fetch"]
-    assert "iCal 取得失敗" in capsys.readouterr().err
-
-
-def test_main_returns_non_zero_when_dot_send_fails(monkeypatch, capsys) -> None:
-    window = make_empty_window()
-
-    monkeypatch.setattr(main_module, "_batch_start_now", lambda: BATCH_START)
-    monkeypatch.setattr(main_module, "load_config", make_dot_config)
-    monkeypatch.setattr(
-        main_module,
-        "fetch_icals",
-        lambda _: (FetchedIcal(source_index=0, url=ICS_URL_A, text="ics"),),
-    )
-    monkeypatch.setattr(main_module, "parse_icals", lambda *_args, **_kwargs: window)
-    monkeypatch.setattr(main_module, "render_png", lambda _: PngImage(content=b"png", width=296, height=152))
-    monkeypatch.setattr(
-        main_module,
-        "send_dot_image",
-        lambda *_: (_ for _ in ()).throw(HandyCalendarError("Dot 送信失敗 code=400")),
-    )
-
-    assert main_module.main() == 1
-    assert "Dot 送信失敗 code=400" in capsys.readouterr().err
+    assert "接続確認失敗: Dot 送信失敗: デバイスが見つかりません" in capsys.readouterr().err

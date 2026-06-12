@@ -11,8 +11,8 @@
 |------|------|------|
 | OS | **Linux** | - |
 | タイムゾーン | ホスト OS を **Asia/Tokyo** に設定する | cron の時刻はホスト OS のタイムゾーンで解釈する |
-| 配置 | `/home/scripts/handy-calendar/` に配置する | 初回の取得は「セットアップ」の `git clone` |
-| 実行 | 毎日 **0:00 JST** に cron で `.venv/bin/python -m handy_calendar` を実行 | 手動実行は「動作確認」 |
+| 配置 | `/home/scripts/quote0/` に配置する | 初回の取得は「セットアップ」の `git clone` |
+| 実行 | 毎日 **0:00 JST** に cron で `.venv/bin/python -m quote0.commands.send_ical` を実行 | 手動実行は「動作確認」 |
 | 秘密情報 | `.env` | [AGENTS.md](../AGENTS.md) の「設定（環境変数）」。作成・設定は「環境変数（`.env`）」 |
 | Python | ホスト **3.12**（`.python-version`） | `python3.12` が無いときは「Python 3.12 のインストール」 |
 
@@ -22,8 +22,8 @@
 
 ```bash
 # リポジトリを clone し、作業ディレクトリへ移動
-git clone https://github.com/ryofujimotox/handy-calendar /home/scripts/handy-calendar
-cd /home/scripts/handy-calendar
+git clone https://github.com/ryofujimotox/quote0 /home/scripts/quote0
+cd /home/scripts/quote0
 
 # 仮想環境を作成し、依存パッケージを入れる
 python3.12 -m venv .venv
@@ -37,7 +37,7 @@ python3.12 -m venv .venv
 ### 環境変数（`.env`）
 
 ```bash
-cd /home/scripts/handy-calendar
+cd /home/scripts/quote0
 cp -n .env.example .env
 chmod 600 .env
 ```
@@ -51,8 +51,8 @@ chmod 600 .env
 バッチを手動で 1 回実行する。
 
 ```bash
-cd /home/scripts/handy-calendar
-.venv/bin/python -m handy_calendar
+cd /home/scripts/quote0
+.venv/bin/python -m quote0.commands.send_ical
 echo $?
 ```
 
@@ -66,7 +66,7 @@ echo $?
 ローカルで単体テストを実行するときだけ、開発依存を入れて実行する（本番運用の cron 実行環境には入れない）。
 
 ```bash
-cd /home/scripts/handy-calendar
+cd /home/scripts/quote0
 .venv/bin/pip install -r requirements-dev.txt # 初回のみ
 .venv/bin/python -m pytest
 ```
@@ -84,7 +84,14 @@ crontab -e
 ```
 
 ```cron
-0 0 * * * cd /home/scripts/handy-calendar && .venv/bin/python -m handy_calendar
+0 0 * * * cd /home/scripts/quote0 && .venv/bin/python -m quote0.commands.send_ical >>/var/log/quote0/send_ical.log 2>&1
+```
+
+初回はログ用ディレクトリを作成する。
+
+```bash
+sudo mkdir -p /var/log/quote0
+sudo chown "$(whoami)" /var/log/quote0
 ```
 
 `crontab -l` で登録内容を確認する。
@@ -95,12 +102,13 @@ crontab -l
 
 - 上記 1 行が表示されれば OK
 
+cron 実行後は `/var/log/quote0/send_ical.log` に stdout / stderr が追記される。失敗時は終了コードとログ末尾の段名付きメッセージを確認する（`DOT_API_TOKEN` 等の秘密値はログに出ない）。
 
 
 ## 更新
 
 ```bash
-cd /home/scripts/handy-calendar
+cd /home/scripts/quote0
 git pull
 .venv/bin/pip install -r requirements.txt
 ```
@@ -109,8 +117,10 @@ git pull
 
 `.python-version` を上げたときは、文末「Python 3.12 のインストール」のあと、下記で `.venv` を作り直す。
 
+`/home/scripts/quote0` から移行するときは clone 先を `/home/scripts/quote0` にし、cron のパスと `python -m quote0.commands.send_ical` に合わせる。
+
 ```bash
-cd /home/scripts/handy-calendar
+cd /home/scripts/quote0
 rm -rf .venv
 python3.12 -m venv .venv
 .venv/bin/pip install -U pip

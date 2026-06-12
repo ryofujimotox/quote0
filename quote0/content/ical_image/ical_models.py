@@ -74,13 +74,13 @@ class DaySchedule:
     """1 日分の表示データ。
 
     例: DaySchedule(
-            day=2026-05-29,
+            date=2026-05-29,
             period=[29日0時, 30日0時),
             events=(CalendarEvent(…),),
         )
     """
 
-    day: date
+    date: date
     period: DateRange  # その日 0:00 以上 翌日 0:00 未満（JST）の枠
     events: tuple[CalendarEvent, ...]
 
@@ -89,10 +89,10 @@ class DaySchedule:
 class CalendarWindow:
     """今日・次の予定日の表示データ。
 
-    例: CalendarWindow(today=DaySchedule(2026-05-29, …), next_day=DaySchedule(2026-05-31, …))
+    例: CalendarWindow(first_day=DaySchedule(2026-05-29, …), next_day=DaySchedule(2026-05-31, …))
     """
 
-    today: DaySchedule
+    first_day: DaySchedule
     next_day: DaySchedule
 
 
@@ -107,14 +107,3 @@ class PngImage:
     width: int
     height: int
     content_type: str = "image/png"
-
-
-@dataclass(frozen=True)
-class DotSendResult:
-    """Dot Image API 送信結果。
-
-    例: DotSendResult(status_code=200, response_text='{"ok":true}')
-    """
-
-    status_code: int
-    response_text: str

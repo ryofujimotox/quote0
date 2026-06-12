@@ -7,11 +7,17 @@
 
 | 項目 | 決め方 |
 |------|------|
-| PR先 | ブランチ分岐元へ向けて PR を作成する |
+| GitHub Default branch | **`dev`**（[Settings](https://github.com/ryofujimotox/quote0/settings)） |
+| PR 先（base） | **`dev`** |
+| `main` | リリース用。日常 PR は向けない。反映は **dev → main** |
 | Reviewer | **@codex review** |
 
-- PR では Reviewer に **@codex review** を指定する
-- 後から `git log` を見たとき、**何の変更か一目で分かる**（下記**コミットメッセージのルール**）
+- コミットメッセージ：**何の変更か一目で分かること**（下記「コミットメッセージのルール」）
+- レビュー依頼（初回）：PR コメントに **@codex review**
+- 再レビュー依頼（指摘対応後）：PR コメントに **@codex review** を再度付ける
+- Issue 自動クローズ：PR **説明**に `Fixes #N` を書き **dev へマージ**する
+- 原則、1 Issue につきブランチ 1 本・PR 1 つ。小さな Issue（例: 文言修正のみ）は複数を 1 PR にまとめてよい
+- 複数 Issue を並行で進めるとき: [issue-parallel-plan.md](issue-parallel-plan.md) のテンプレートを `plan.md` にコピーして整理する
 
 
 

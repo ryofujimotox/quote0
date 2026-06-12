@@ -7,11 +7,10 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from quote0.vendor.quote0_client.exceptions import Quote0Error
 
-from .errors import HandyCalendarError
 
-
-class ConfigError(HandyCalendarError, ValueError):
+class ConfigError(Quote0Error, ValueError):
     """設定不備を表す例外。"""
 
 
@@ -23,12 +22,14 @@ class AppConfig:
             ical_urls=("https://cal.example/a.ics",),
             dot_api_token="token",
             dot_device_id="dev-1",
+            debug=False,
         )
     """
 
     ical_urls: tuple[str, ...]
     dot_api_token: str
     dot_device_id: str
+    debug: bool = False
 
 
 def load_config(env_file: str | Path | None = None) -> AppConfig:
@@ -55,8 +56,17 @@ def load_config(env_file: str | Path | None = None) -> AppConfig:
     if not dot_device_id:
         raise ConfigError("環境変数 DOT_DEVICE_ID が未設定です。")
 
+    debug = _env_flag_enabled("QUOTE0_DEBUG")
+
     return AppConfig(
         ical_urls=ical_urls,
         dot_api_token=dot_api_token,
         dot_device_id=dot_device_id,
+        debug=debug,
     )
+
+
+def _env_flag_enabled(name: str) -> bool:
+    """`1` / `true` / `yes` / `on`（大文字小文字無視）なら True。"""
+    value = os.getenv(name, "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
