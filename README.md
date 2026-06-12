@@ -8,7 +8,11 @@
 
 電子ペーパーデバイス（Quote/0）を利用して、直近の予定が一目で分かるようにする。
 
-![サンプル PNG（テスト用固定データ）](./docs/samples/sample.png)
+![Quote/0](./docs/images/quote0.png)
+*玄関でゴミの日を確認できる*
+
+![Google カレンダー（入力例）](./docs/images/google_calendar.png)
+*[Google カレンダー](https://support.google.com/calendar/answer/37648?hl=ja#zippy=%2C%E3%82%AB%E3%83%AC%E3%83%B3%E3%83%80%E3%83%BC%E3%82%92%E8%A1%A8%E7%A4%BA%E3%81%99%E3%82%8B%E9%96%B2%E8%A6%A7%E3%81%AE%E3%81%BF) 等の公開 iCal から予定を読み取る*
 
 
 
@@ -95,6 +99,7 @@ tests/                  # 単体テスト（quote0/ と同じ階層）
 
 AGENTS.md               # 要件・振る舞い（仕様の正本）
 docs/deploy.md          # Linux 配置・cron
+docs/images/            # ドキュメント用画像
 docs/git.md             # Git 運用
 docs/issue-parallel-plan.md  # Issue 並行解決プラン（テンプレート）
 .env.example            # 環境変数名テンプレ
