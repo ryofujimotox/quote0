@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime
 
-from quote0.config import load_config
+from quote0.config import ConfigError, load_config
 from quote0.content.ical_image import CustomIcalImageContentRequest
 from quote0.content.ical_image.ical_models import JST
 from quote0.content.jp_quote0_client import JpQuote0Client as Quote0Client
+from quote0.pipeline_log import log_error, log_info, log_stage_start, log_stage_success
 from quote0.vendor.quote0_client.exceptions import Quote0Error
-
-
-def log_error(message: str) -> None:
-    """cron で追えるように stderr へ日本語の失敗理由を出す。"""
-    print(message, file=sys.stderr)
 
 
 def _batch_start_now() -> datetime:
@@ -37,28 +32,28 @@ def main() -> int:
         content = CustomIcalImageContentRequest(
             ical_urls=ical_urls,
             reference_now=reference_now,
+            debug=config.debug,
         ).to_image_content_request()
-        print(
-            f"Dot 送信: device_id={dot_device_id}, bytes={len(content.image)}",
-            flush=True,
-        )
 
-        # Dot API を使用して画像を送信
+        log_stage_start("Dot 送信", detail=f"device_id={dot_device_id}, bytes={len(content.image)}")
         client = Quote0Client(api_key=dot_api_token)
         client.send_image(dot_device_id, content)
+        log_stage_success("Dot 送信", detail=f"device_id={dot_device_id}")
+    except ConfigError as exc:
+        log_error(f"設定失敗: {exc}")
+        return 1
     except Quote0Error as exc:
-        log_error(f"起動失敗: {exc}")
+        log_error(str(exc))
         return 1
     except Exception as exc:
-        log_error(f"起動失敗: 想定外のエラーです: {exc}")
+        log_error(f"想定外のエラー: {exc}")
         return 1
     finally:
         if client is not None:
             client.close()
 
-    print(
+    log_info(
         "バッチ完了: iCal取得→解析→PNG→Dot送信 "
         f"(ical_urls={len(ical_urls)}件, device_id={dot_device_id})",
-        flush=True,
     )
     return 0

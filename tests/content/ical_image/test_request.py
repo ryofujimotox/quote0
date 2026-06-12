@@ -44,8 +44,9 @@ def test_custom_ical_image_content_request_builds_image_request(monkeypatch: pyt
         captured["urls"] = urls
         return fetched
 
-    def fake_parse(calendars, *, reference_now=None):
+    def fake_parse(calendars, *, reference_now=None, debug=False):
         captured["reference_now"] = reference_now
+        captured["debug"] = debug
         return window
 
     def fake_render(calendar) -> PngImage:
@@ -59,10 +60,12 @@ def test_custom_ical_image_content_request_builds_image_request(monkeypatch: pyt
     request = CustomIcalImageContentRequest(
         ical_urls=(ICS_URL_A,),
         reference_now=BATCH_START,
+        debug=True,
     ).to_image_content_request()
 
     assert captured["urls"] == (ICS_URL_A,)
     assert captured["reference_now"] == BATCH_START
+    assert captured["debug"] is True
     assert captured["calendar"] == window
     assert request.image == base64.b64encode(image.content).decode("ascii")
 

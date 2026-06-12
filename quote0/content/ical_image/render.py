@@ -21,6 +21,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from quote0.pipeline_log import log_stage_start, log_stage_success
 from quote0.vendor.quote0_client.exceptions import Quote0Error
 from .ical_models import CalendarEvent, CalendarWindow, DaySchedule, JST, PngImage
 
@@ -175,9 +176,9 @@ def _display_event_from_calendar(event: CalendarEvent, display_date: date) -> Di
 def render_png(calendar: CalendarWindow) -> PngImage:
     """CalendarWindow から PNG バイト列を作る。"""
     display_days = build_display_days(calendar)
-    print(
-        "PNG 生成: "
-        f"{display_days[0].date.isoformat()} / {display_days[1].date.isoformat()}"
+    log_stage_start(
+        "PNG 生成",
+        detail=f"{display_days[0].date.isoformat()} / {display_days[1].date.isoformat()}",
     )
     regular_path, bold_path = _resolve_font_paths()
     fonts = _load_fonts(regular_path, bold_path)
@@ -211,7 +212,9 @@ def render_png(calendar: CalendarWindow) -> PngImage:
 
     output = BytesIO()
     image.save(output, format="PNG", optimize=False)
-    return PngImage(content=output.getvalue(), width=WIDTH, height=HEIGHT)
+    png = PngImage(content=output.getvalue(), width=WIDTH, height=HEIGHT)
+    log_stage_success("PNG 生成", detail=f"{png.width}x{png.height}, bytes={len(png.content)}")
+    return png
 
 
 def _build_lines(display_days: tuple[DisplayDay, ...]) -> list[RenderLine]:

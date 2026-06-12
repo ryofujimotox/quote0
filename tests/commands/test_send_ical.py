@@ -125,7 +125,9 @@ def test_send_ical_returns_non_zero_and_stops_when_step_fails(monkeypatch, capsy
 
     assert send_ical_main.main() == 1
     assert called == []
-    assert "iCal 取得失敗" in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert "iCal 取得失敗" in captured.err
+    assert "起動失敗" not in captured.err
 
 
 def test_send_ical_returns_non_zero_when_dot_send_fails(monkeypatch, capsys) -> None:

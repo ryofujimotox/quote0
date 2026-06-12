@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 from icalendar import Calendar
 from recurring_ical_events import of as recurring_events_of
 
+from quote0.pipeline_log import log_info, log_stage_start, log_stage_success
 from quote0.vendor.quote0_client.exceptions import Quote0Error
 from .ical_models import CalendarEvent, CalendarWindow, DateRange, DaySchedule, FetchedIcal, JST
 
@@ -50,7 +51,7 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
         → (FetchedIcal(0, "https://cal.example/a.ics", "BEGIN:VCALENDAR…"),
            FetchedIcal(1, "https://cal.example/b.ics", "BEGIN:VCALENDAR…"))
     """
-    print(f"iCal 取得: {len(urls)}件", flush=True)
+    log_stage_start("iCal 取得", detail=f"{len(urls)}件")
     fetched: list[FetchedIcal] = []
     for index, url in enumerate(urls):
         request = Request(url, headers={"User-Agent": "quote0/0"})
@@ -61,7 +62,7 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
                     raise Quote0Error(f"iCal 取得失敗 url={url} status={status}")
                 content = response.read()
                 text = _decode_ics(content, response.headers)
-                print(f"iCal 取得詳細: source={index}, bytes={len(content)}", flush=True)
+                log_info(f"iCal 取得詳細: source={index}, bytes={len(content)}")
                 fetched.append(FetchedIcal(source_index=index, url=url, text=text))
         except HTTPError as exc:
             raise Quote0Error(f"iCal 取得失敗 url={url} status={exc.code}") from exc
@@ -69,6 +70,7 @@ def fetch_icals(urls: tuple[str, ...]) -> tuple[FetchedIcal, ...]:
             raise Quote0Error(f"iCal 取得失敗 url={url} reason={exc.reason}") from exc
         except TimeoutError as exc:
             raise Quote0Error(f"iCal 取得失敗 url={url} reason=timeout") from exc
+    log_stage_success("iCal 取得", detail=f"{len(fetched)}件")
     return tuple(fetched)
 
 
@@ -76,6 +78,7 @@ def parse_icals(
     calendars: tuple[FetchedIcal, ...],
     *,
     reference_now: datetime | None = None,
+    debug: bool = False,
 ) -> CalendarWindow:
     """取得済み ICS から今日・次の予定日の予定を抽出する。
 
@@ -93,25 +96,24 @@ def parse_icals(
     reference_now = normalize_reference_now_jst(reference_now)
     first_date = reference_now.date()
     first_period = day_range(first_date)
-    print(f"iCal 解析: {len(calendars)}件", flush=True)
+    log_stage_start("iCal 解析", detail=f"{len(calendars)}件")
     events = _sorted_events(
         event
         for calendar in calendars
         for event in _parse_calendar_events(calendar, first_date)
     )
-    print(f"iCal 解析詳細: total_events={len(events)}", flush=True)
-    for event in events:
-        print(
-            "iCal 予定: "
-            f"source={event.source_index}, uid={event.uid}, title={event.title}, "
-            f"start={event.period.start.isoformat()}, end={event.period.end.isoformat()}, "
-            f"all_day={event.all_day}",
-            flush=True,
-        )
+    if debug:
+        for event in events:
+            log_info(
+                "iCal 予定詳細: "
+                f"source={event.source_index}, uid={event.uid}, title={event.title}, "
+                f"start={event.period.start.isoformat()}, end={event.period.end.isoformat()}, "
+                f"all_day={event.all_day}, url={event.source_url}",
+            )
     next_date = _find_next_event_day(events, first_date)
     next_period = day_range(next_date)
     # 今日枠は overlap（前日開始の進行中も載せる）。2枠目は開始日のみ（日跨ぎの二重表示を避ける）
-    return CalendarWindow(
+    window = CalendarWindow(
         first_day=DaySchedule(
             date=first_date,
             period=first_period,
@@ -123,6 +125,15 @@ def parse_icals(
             events=_events_still_active(_events_starting_on_day(events, next_period), reference_now),
         ),
     )
+    log_stage_success(
+        "iCal 解析",
+        detail=(
+            f"total_events={len(events)}, "
+            f"first_day={len(window.first_day.events)}件, "
+            f"next_day={window.next_day.date.isoformat()}({len(window.next_day.events)}件)"
+        ),
+    )
+    return window
 
 
 def _find_next_event_day(events: tuple[CalendarEvent, ...], first_date: date) -> date:

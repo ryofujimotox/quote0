@@ -339,6 +339,48 @@ END:VCALENDAR
 """
 
 
+def test_parse_icals_omits_event_titles_from_stdout_by_default(capsys) -> None:
+    today_only_ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:visible
+SUMMARY:ログに出さない予定
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
+    parse_icals((make_fetched_ical(today_only_ics),), reference_now=REFERENCE_NOW)
+
+    output = capsys.readouterr().out
+    assert "ログに出さない予定" not in output
+    assert "iCal 解析 成功" in output
+
+
+def test_parse_icals_logs_event_details_when_debug(capsys) -> None:
+    today_only_ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:visible
+SUMMARY:デバッグで見える予定
+DTSTART;TZID=Asia/Tokyo:20260529T100000
+DTEND;TZID=Asia/Tokyo:20260529T110000
+END:VEVENT
+END:VCALENDAR
+"""
+
+    parse_icals(
+        (make_fetched_ical(today_only_ics),),
+        reference_now=REFERENCE_NOW,
+        debug=True,
+    )
+
+    output = capsys.readouterr().out
+    assert "デバッグで見える予定" in output
+    assert "iCal 予定詳細:" in output
+
+
 def test_parse_icals_keeps_all_day_events_on_today_until_day_end() -> None:
     evening = datetime(2026, 5, 29, 20, 0, tzinfo=JST)
 
